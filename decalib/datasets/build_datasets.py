@@ -14,7 +14,7 @@ from .Stirling import StirlingDataset
 
 def build_train(config, is_train=True):
     data_list = []
-    if 'LYHM' in config.training_data:
+    if 'Stirling' in config.training_data:
         data_list.append(StirlingDataset(config))
     dataset = ConcatDataset(data_list)
     

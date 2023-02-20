@@ -31,16 +31,13 @@ from torchvision import transforms
 
 
 class BaseDataset(Dataset, ABC):
-    def __init__(self, name, config, device, isEval):
+    def __init__(self, name, config, isEval):
         self.K = config.K
         self.isEval = isEval
-        self.n_train = np.Inf
-        self.imagepaths = []
+        self.actors = []
         self.face_dict = {}
         self.name = name
-        self.device = device
         self.min_max_K = 0
-        self.cluster = False
         self.dataset_root = config.root
         self.total_images = 0
         self.image_folder = 'arcface_input'
@@ -49,11 +46,11 @@ class BaseDataset(Dataset, ABC):
 
     def initialize(self):
         logger.info(f'[{self.name}] Initialization')
-        image_list = f'{os.path.abspath(os.path.dirname(__file__))}/image_paths/{self.name}.npy'
-        logger.info(f'[{self.name}] Load cached file list: ' + image_list)
-        self.face_dict = np.load(image_list, allow_pickle=True).item()
-        self.imagepaths = list(self.face_dict.keys())
-        logger.info(f'[Dataset {self.name}] Total {len(self.imagepaths)} actors loaded!')
+        image_list_file = f'{os.path.abspath(os.path.dirname(__file__))}/image_paths/{self.name}.npy'
+        logger.info(f'[{self.name}] Load cached file list: ' + image_list_file)
+        self.face_dict = np.load(image_list_file, allow_pickle=True).item()
+        self.actors = list(self.face_dict.keys())
+        logger.info(f'[Dataset {self.name}] Total {len(self.actors)} actors loaded!')
         self.set_smallest_k()
 
     def set_smallest_k(self):
@@ -66,22 +63,18 @@ class BaseDataset(Dataset, ABC):
             if length > max_min_k:
                 max_min_k = length
 
-        self.total_images = reduce(lambda k, l: l + k, map(lambda e: len(self.face_dict[e][0]), self.imagepaths))
+        self.total_images = reduce(lambda k, l: l + k, map(lambda e: len(self.face_dict[e][0]), self.actors))
         loguru.logger.info(f'Dataset {self.name} with min K = {self.min_max_K} max K = {max_min_k} length = {len(self.face_dict)} total images = {self.total_images}')
         return self.min_max_K
 
-    def compose_transforms(self, *args):
-        self.transforms = transforms.Compose([t for t in args])
-
-    def get_arcface_path(self, image_path):
-        return re.sub('png|jpg', 'npy', str(image_path))
-
     def __len__(self):
-        return len(self.imagepaths)
+        return len(self.actors)
 
     def __getitem__(self, index):
-        actor = self.imagepaths[index]
+        actor = self.actors[index]
         images, params_path = self.face_dict[actor]
+        # 把actor前缀消除
+        images = [path.split('/')[1] for path in images]
         images = [Path(self.dataset_root, self.name, self.image_folder, path) for path in images]
         sample_list = np.array(np.random.choice(range(len(images)), size=self.K, replace=False))
 
@@ -108,18 +101,17 @@ class BaseDataset(Dataset, ABC):
             image = np.array(imread(image_path))
             image = image / 255.
             image = image.transpose(2, 0, 1)
-            arcface_image = np.load(self.get_arcface_path(image_path), allow_pickle=True)
 
             images_list.append(image)
-            arcface_list.append(torch.tensor(arcface_image))
 
         images_array = torch.from_numpy(np.array(images_list)).float()
-        arcface_array = torch.stack(arcface_list).float()
 
         return {
             'image': images_array,
-            'arcface': arcface_array,
             'imagename': actor,
             'dataset': self.name,
             'flame': flame,
+            # 'arcface':arcfaces
+            # 'landmark':lmks
+            # 'mask':masks
         }
