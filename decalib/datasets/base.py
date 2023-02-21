@@ -24,6 +24,12 @@ from pathlib import Path
 import loguru
 import numpy as np
 import torch
+import cv2
+import math
+from insightface.app import FaceAnalysis
+from insightface.app.common import Face
+from insightface.utils import face_align
+from .detectors import FAN
 from loguru import logger
 from skimage.io import imread
 from torch.utils.data import Dataset
@@ -46,12 +52,17 @@ class BaseDataset(Dataset, ABC):
 
     def initialize(self):
         logger.info(f'[{self.name}] Initialization')
+        # 只要是数据集都会有npy文件
         image_list_file = f'{os.path.abspath(os.path.dirname(__file__))}/image_paths/{self.name}.npy'
         logger.info(f'[{self.name}] Load cached file list: ' + image_list_file)
         self.face_dict = np.load(image_list_file, allow_pickle=True).item()
         self.actors = list(self.face_dict.keys())
         logger.info(f'[Dataset {self.name}] Total {len(self.actors)} actors loaded!')
         self.set_smallest_k()
+        # 为把原始图片裁剪成224*224做准备
+        self.app = FaceAnalysis(name='antelopev2', providers=['CUDAExecutionProvider'])
+        self.app.prepare(ctx_id=0, det_size=(224, 224))
+        self.fan = FAN()
 
     def set_smallest_k(self):
         self.min_max_K = np.Inf
@@ -93,25 +104,61 @@ class BaseDataset(Dataset, ABC):
             'pose_params': torch.cat(K * [torch.cat([pose[:3], pose[6:9]])[None]], dim=0),
         }
 
-        images_list = []
         arcface_list = []
+        landmark_list = []
 
         for i in sample_list:
             image_path = images[i]
-            image = np.array(imread(image_path))
-            image = image / 255.
-            image = image.transpose(2, 0, 1)
+            img = cv2.imread(image_path)
+            # 以下部分是在跑一个人脸检测模型，得到置信分数最高的边界框，然后裁剪
+            bboxes, kpss = self.app.det_model.detect(img, max_num=0, metric='default')
+            if bboxes.shape[0] == 0:
+                continue
+            i = get_center(bboxes, img)
+            bbox = bboxes[i, 0:4]
+            det_score = bboxes[i, 4]
+            kps = None
+            if kpss is not None:
+                kps = kpss[i]
 
-            images_list.append(image)
+            face = Face(bbox=bbox, kps=kps, det_score=det_score)
+            arcface = face_align.norm_crop(img, landmark=face.kps, image_size=224)
+            arcface = arcface / 255.0
+            arcface_list.append(arcface)
 
-        images_array = torch.from_numpy(np.array(images_list)).float()
+            # 获得 landmarks
+            landmark = self.fan.model(img)
+            landmark_list.append(landmark)
+
+        images_array = torch.from_numpy(np.array(arcface_list)).float()
+        landmarks = torch.from_numpy(np.array(landmark_list)).float()
 
         return {
-            'image': images_array,
+            'images': images_array,
             'imagename': actor,
             'dataset': self.name,
             'flame': flame,
-            # 'arcface':arcfaces
-            # 'landmark':lmks
+            'landmark':landmarks
             # 'mask':masks
         }
+
+
+def dist(p1, p2):
+    return math.sqrt(((p1[0] - p2[0]) ** 2) + ((p1[1] - p2[1]) ** 2))
+
+
+def get_center(bboxes, img):
+    img_center = img.shape[0] // 2, img.shape[1] // 2
+    size = bboxes.shape[0]
+    distance = np.Inf
+    j = 0
+    for i in range(size):
+        x1, y1, x2, y2 = bboxes[i, 0:4]
+        dx = abs(x2 - x1) / 2.0
+        dy = abs(y2 - y1) / 2.0
+        current = dist((x1 + dx, y1 + dy), img_center)
+        if current < distance:
+            distance = current
+            j = i
+
+    return j
