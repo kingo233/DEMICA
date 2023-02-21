@@ -48,6 +48,7 @@ class BaseDataset(Dataset, ABC):
         self.total_images = 0
         self.image_folder = 'images'
         self.flame_folder = 'FLAME_parameters'
+        self.mask_folder = 'masks'
         self.initialize()
 
     def initialize(self):
@@ -83,16 +84,21 @@ class BaseDataset(Dataset, ABC):
 
     def __getitem__(self, index):
         actor = self.actors[index]
-        images, params_path = self.face_dict[actor]
+        images_path, params_path = self.face_dict[actor]
         # 把actor前缀消除
-        images = [path.split('/')[1] for path in images]
-        images = [Path(self.dataset_root, self.name, self.image_folder, path) for path in images]
-        sample_list = np.array(np.random.choice(range(len(images)), size=self.K, replace=False))
+        images_path = [path.split('/')[1] for path in images_path]
+        images_path = [Path(self.dataset_root, self.name, self.image_folder, path) for path in images_path]
+
+        # 把images字样换成masks就是mask路径
+        masks_path = [Path(self.dataset_root, self.name, self.mask_folder, path) for path in images_path]
+        masks_path = [str(path).replace('images','masks') for path in masks_path]
+
+        sample_list = np.array(np.random.choice(range(len(images_path)), size=self.K, replace=False))
 
         K = self.K
         if self.isEval:
             K = max(0, min(200, self.min_max_K))
-            sample_list = np.array(range(len(images))[:K])
+            sample_list = np.array(range(len(images_path))[:K])
 
         params = np.load(os.path.join(self.dataset_root, self.name, self.flame_folder, params_path), allow_pickle=True)
         pose = torch.tensor(params['pose']).float()
@@ -106,9 +112,11 @@ class BaseDataset(Dataset, ABC):
 
         arcface_list = []
         landmark_list = []
+        mask_list = []
 
         for i in sample_list:
-            image_path = images[i]
+            image_path = images_path[i]
+            mask_path = masks_path[i]
             img = cv2.imread(str(image_path))
             # 以下部分是在跑一个人脸检测模型，得到置信分数最高的边界框，然后裁剪
             bboxes, kpss = self.app.det_model.detect(img, max_num=0, metric='default')
@@ -130,16 +138,22 @@ class BaseDataset(Dataset, ABC):
             landmark = self.fan.model.get_landmarks(img)
             landmark_list.append(landmark[0])
 
+            # 获得mask
+            mask = cv2.imread(mask_path)
+            mask = cv2.resize(mask,(224,224))
+            mask_list.append(np.array(mask))
+
         images_array = torch.from_numpy(np.array(arcface_list)).float()
         landmarks = torch.from_numpy(np.array(landmark_list)).float()
+        masks = torch.from_numpy(np.array(mask_list)).float()
 
         return {
             'images': images_array,
             'imagename': actor,
             'dataset': self.name,
             'flame': flame,
-            'landmark':landmarks
-            # 'mask':masks
+            'landmark':landmarks,
+            'mask':masks
         }
 
 
