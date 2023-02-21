@@ -173,10 +173,10 @@ class Trainer(object):
             
             ############################# base shape
             predicted_landmarks = opdict['landmarks2d']
-            if self.cfg.loss.useWlmk:
-                losses['landmark'] = lossfunc.weighted_landmark_loss(predicted_landmarks, lmk)*self.cfg.loss.lmk
-            else:    
-                losses['landmark'] = lossfunc.landmark_loss(predicted_landmarks, lmk)*self.cfg.loss.lmk
+            # if self.cfg.loss.useWlmk:
+            #     losses['landmark'] = lossfunc.weighted_landmark_loss(predicted_landmarks, lmk)*self.cfg.loss.lmk
+            # else:    
+            #     losses['landmark'] = lossfunc.landmark_loss(predicted_landmarks, lmk)*self.cfg.loss.lmk
             if self.cfg.loss.eyed > 0.:
                 losses['eye_distance'] = lossfunc.eyed_loss(predicted_landmarks, lmk)*self.cfg.loss.eyed
             if self.cfg.loss.lipd > 0.:

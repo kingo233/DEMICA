@@ -141,9 +141,7 @@ class BaseDataset(Dataset, ABC):
 
             # 获得 landmarks
             landmark = self.fan.model.get_landmarks(img)
-            landmark = landmark[0]
-            landmark = np.hstack([landmark, np.ones([landmark.shape[0],1])])
-            landmark_list.append(landmark)
+            landmark_list.append(landmark[0])
 
             # 获得mask
             mask = cv2.imread(mask_path)
