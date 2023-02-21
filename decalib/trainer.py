@@ -201,9 +201,11 @@ class Trainer(object):
             losses['light_reg'] = ((torch.mean(codedict['light'], dim=2)[:,:,None] - codedict['light'])**2).mean()*self.cfg.loss.reg_light
 
             ground_flame_para = batch['flame']
+            exp_code = ground_flame_para['expression_params']
+            exp_code = torch.cat([exp_code,exp_code,exp_code],dim=0)
             ground_flame_verts, landmarks2d_, landmarks3d_ = self.deca.flame(
-                shape_params=ground_flame_para['shape_params'], 
-                expression_params=ground_flame_para['expression_params'], 
+                shape_params=ground_flame_para['shape_params'], # 300
+                expression_params=ground_flame_para['expression_params'],  # 100
                 pose_params=ground_flame_para['pose_params'])
             losses['flame'] = (pred_flame_verts - ground_flame_verts).abs()
 
