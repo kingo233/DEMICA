@@ -11,40 +11,6 @@ from glob import glob
 
 from . import detectors
 
-def build_dataloader(config, is_train=True):
-    data_list = []
-    if 'vox1' in config.training_data:
-        data_list.append(VoxelDataset(K=config.K, image_size=config.image_size, scale=[config.scale_min, config.scale_max], n_train=config.n_train, isSingle=config.isSingle))
-    if 'vox2' in config.training_data:
-        data_list.append(VoxelDataset(dataname='vox2', K=config.K, image_size=config.image_size, scale=[config.scale_min, config.scale_max], n_train=config.n_train, isSingle=config.isSingle))
-    if 'vggface2' in config.training_data:
-        data_list.append(VGGFace2Dataset(K=config.K, image_size=config.image_size, scale=[config.scale_min, config.scale_max], trans_scale=config.trans_scale, isSingle=config.isSingle))
-    if 'vggface2hq' in config.training_data:
-        data_list.append(VGGFace2HQDataset(K=config.K, image_size=config.image_size, scale=[config.scale_min, config.scale_max], trans_scale=config.trans_scale, isSingle=config.isSingle))
-    if 'ethnicity' in config.training_data:
-        data_list.append(EthnicityDataset(K=config.K, image_size=config.image_size, scale=[config.scale_min, config.scale_max], trans_scale=config.trans_scale, isSingle=config.isSingle))
-    if 'coco' in config.training_data:
-        data_list.append(COCODataset(image_size=config.image_size, scale=[config.scale_min, config.scale_max], trans_scale=config.trans_scale))
-    if 'celebahq' in config.training_data:
-        data_list.append(CelebAHQDataset(image_size=config.image_size, scale=[config.scale_min, config.scale_max], trans_scale=config.trans_scale))
-    if 'now_eval' in config.training_data:
-        data_list.append(NoWVal())
-    if 'aflw2000' in config.training_data:
-        data_list.append(AFLW2000())
-    train_dataset = ConcatDataset(data_list)
-    if is_train:
-        drop_last = True
-        shuffle = True
-    else:
-        drop_last = False
-        shuffle = False
-    train_loader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=shuffle,
-                            num_workers=config.num_workers,
-                            pin_memory=True,
-                            drop_last = drop_last)
-    # print('---- data length: ', len(train_dataset))
-    return train_dataset, train_loader
-
 '''
 images and keypoints: nomalized to [-1,1]
 '''
