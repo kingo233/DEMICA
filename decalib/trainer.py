@@ -112,12 +112,14 @@ class Trainer(object):
         if self.train_detail:
             self.deca.E_flame.eval()
         # [B, K, 3, size, size] ==> [BxK, 3, size, size]
-        images = batch['image'].to(self.device); images = images.view(-1, images.shape[-3], images.shape[-2], images.shape[-1]) 
+        # images是arcface input
+        images = batch['images'].to(self.device); images = images.view(-1, images.shape[-3], images.shape[-2], images.shape[-1]) 
         lmk = batch['landmark'].to(self.device); lmk = lmk.view(-1, lmk.shape[-2], lmk.shape[-1])
         masks = batch['mask'].to(self.device); masks = masks.view(-1, images.shape[-2], images.shape[-1]) 
+        arcfaces = batch['arcface'].to(self.device); arcfaces = arcfaces.view(-1,arcfaces.shape[-3], arcfaces.shape[-2], arcfaces.shape[-1]) 
 
         #-- encoder
-        codedict = self.deca.encode(images, use_detail=self.train_detail)
+        codedict = self.deca.encode(images, arcfaces, use_detail=self.train_detail)
         
         ### shape constraints for coarse model
         ### detail consistency for detail model
@@ -309,9 +311,10 @@ class Trainer(object):
         except:
             self.val_iter = iter(self.val_dataloader)
             batch = next(self.val_iter)
-        images = batch['image'].to(self.device); images = images.view(-1, images.shape[-3], images.shape[-2], images.shape[-1]) 
+        images = batch['image'].to(self.device); images = images.view(-1, images.shape[-3], images.shape[-2], images.shape[-1])
+        arcfaces = batch['mask'].to(self.device); arcfaces = arcfaces.view(-1,images.shape[-3], arcfaces.shape[-2], arcfaces.shape[-1]) 
         with torch.no_grad():
-            codedict = self.deca.encode(images)
+            codedict = self.deca.encode(images,arcfaces)
             opdict, visdict = self.deca.decode(codedict)
         savepath = os.path.join(self.cfg.output_dir, self.cfg.train.val_vis_dir, f'{self.global_step:08}.jpg')
         grid_image = util.visualize_grid(visdict, savepath, return_gird=True)
@@ -335,9 +338,10 @@ class Trainer(object):
         faces = self.deca.flame.faces_tensor.cpu().numpy()
         for i, batch in enumerate(tqdm(dataloader, desc='now evaluation ')):
             images = batch['image'].to(self.device)
+            arcfaces = batch['arcface'].to(self.device)
             imagename = batch['imagename']
             with torch.no_grad():
-                codedict = self.deca.encode(images)
+                codedict = self.deca.encode(images, arcfaces)
                 _, visdict = self.deca.decode(codedict)
                 codedict['exp'][:] = 0.
                 codedict['pose'][:] = 0.

@@ -76,7 +76,9 @@ class DECA(nn.Module):
         self.param_dict = {i:model_cfg.get('n_' + i) for i in model_cfg.param_list}
 
         # encoders
+        # 输入大小112 * 112,数据范围归一到[-1,1]
         self.E_flame = CoarseEncoder(output_dim=self.n_param).to(self.device)
+        # 输入大小224 * 224,数据范围归一化到[0,1]
         self.E_detail = ResnetEncoder(outsize=self.n_detail).to(self.device)
         # decoders
         self.flame = FLAME(model_cfg).to(self.device)
@@ -137,13 +139,14 @@ class DECA(nn.Module):
         return vis68
 
     # @torch.no_grad()
-    def encode(self, images, use_detail=True):
+    def encode(self, images, arcfaces, use_detail=True):
+        arcfaces = arcfaces * 2 - 1
         if use_detail:
             # use_detail is for training detail model, need to set coarse model as eval mode
             with torch.no_grad():
-                parameters = self.E_flame(images)
+                parameters = self.E_flame(arcfaces)
         else:
-            parameters = self.E_flame(images)
+            parameters = self.E_flame(arcfaces)
         codedict = self.decompose_code(parameters, self.param_dict)
         codedict['images'] = images
         if use_detail:

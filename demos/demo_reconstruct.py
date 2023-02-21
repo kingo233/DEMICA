@@ -48,8 +48,9 @@ def main(args):
     for i in tqdm(range(len(testdata))):
         name = testdata[i]['imagename']
         images = testdata[i]['image'].to(device)[None,...]
+        arcfaces = testdata[i]['arcface'].to(device)[None,...]
         with torch.no_grad():
-            codedict = deca.encode(images)
+            codedict = deca.encode(images,arcfaces)
             opdict, visdict = deca.decode(codedict) #tensor
             if args.render_orig:
                 tform = testdata[i]['tform'][None, ...]

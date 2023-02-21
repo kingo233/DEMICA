@@ -112,6 +112,7 @@ class BaseDataset(Dataset, ABC):
         arcface_list = []
         landmark_list = []
         mask_list = []
+        image_list = []
 
         for i in sample_list:
             image_path = images_path[i]
@@ -131,6 +132,11 @@ class BaseDataset(Dataset, ABC):
             face = Face(bbox=bbox, kps=kps, det_score=det_score)
             arcface = face_align.norm_crop(img, landmark=face.kps, image_size=224)
             arcface = arcface / 255.0
+            detail_input = arcface
+            arcface = cv2.resize(arcface,(112,112))
+            arcface = np.transpose(arcface,(2,0,1))
+            detail_input = np.transpose(detail_input,(2,0,1))
+            image_list.append(detail_input)
             arcface_list.append(arcface)
 
             # 获得 landmarks
@@ -142,12 +148,15 @@ class BaseDataset(Dataset, ABC):
             mask = cv2.resize(mask,(224,224))
             mask_list.append(np.array(mask))
 
-        images_array = torch.from_numpy(np.array(arcface_list)).float()
+        arcfaces_array = torch.from_numpy(np.array(arcface_list)).float()
         landmarks = torch.from_numpy(np.array(landmark_list)).float()
         masks = torch.from_numpy(np.array(mask_list)).float()
+        images = torch.from_numpy(np.array(image_list)).float()
 
         return {
-            'images': images_array,
+            # images->224 * 224,是detail部分的输入
+            'images': images,
+            'arcface': arcfaces_array,
             'imagename': actor,
             'dataset': self.name,
             'flame': flame,
@@ -175,3 +184,12 @@ def get_center(bboxes, img):
             j = i
 
     return j
+
+input_mean = 127.5
+input_std = 127.5
+
+
+def get_arcface_input(face, img):
+    aimg = face_align.norm_crop(img, landmark=face.kps)
+    blob = cv2.dnn.blobFromImages([aimg], 1.0 / input_std, (112, 112), (input_mean, input_mean, input_mean), swapRB=True)
+    return blob[0], aimg
