@@ -108,8 +108,8 @@ class BaseDataset(Dataset, ABC):
         landmark_list = []
 
         for i in sample_list:
-            image_path = sample_list[i]
-            img = cv2.imread(image_path)
+            image_path = images[i]
+            img = cv2.imread(str(image_path))
             # 以下部分是在跑一个人脸检测模型，得到置信分数最高的边界框，然后裁剪
             bboxes, kpss = self.app.det_model.detect(img, max_num=0, metric='default')
             if bboxes.shape[0] == 0:
@@ -127,8 +127,8 @@ class BaseDataset(Dataset, ABC):
             arcface_list.append(arcface)
 
             # 获得 landmarks
-            landmark = self.fan.model(img)
-            landmark_list.append(landmark)
+            landmark = self.fan.model.get_landmarks(img)
+            landmark_list.append(landmark[0])
 
         images_array = torch.from_numpy(np.array(arcface_list)).float()
         landmarks = torch.from_numpy(np.array(landmark_list)).float()

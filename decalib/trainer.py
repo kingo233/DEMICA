@@ -364,12 +364,12 @@ class Trainer(object):
         logger.info('---- training data numbers: ', len(self.train_dataset))
 
         self.train_dataloader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True,
-                            num_workers=self.cfg.dataset.num_workers,
+                            num_workers=0, # self.cfg.dataset.num_workers,
                             pin_memory=True,
                             drop_last=True)
         self.train_iter = iter(self.train_dataloader)
         self.val_dataloader = DataLoader(self.val_dataset, batch_size=8, shuffle=True,
-                            num_workers=8,
+                            num_workers=0, #8,
                             pin_memory=True,
                             drop_last=False)
         self.val_iter = iter(self.val_dataloader)
