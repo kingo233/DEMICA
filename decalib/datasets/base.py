@@ -90,8 +90,7 @@ class BaseDataset(Dataset, ABC):
         images_path = [Path(self.dataset_root, self.name, self.image_folder, path) for path in images_path]
 
         # 把images字样换成masks就是mask路径
-        masks_path = [Path(self.dataset_root, self.name, self.mask_folder, path) for path in images_path]
-        masks_path = [str(path).replace('images','masks') for path in masks_path]
+        masks_path = [str(path).replace('images','masks') for path in images_path]
 
         sample_list = np.array(np.random.choice(range(len(images_path)), size=self.K, replace=False))
 
