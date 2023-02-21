@@ -10,7 +10,7 @@
 # 
 # 
 # '''
-output_dir: "/ps/scratch/yfeng/Data/Projects-data/DECA-training/training/DECA_release_version/pretrain"
+output_dir: "logs/pretrain"
 pretrained_modelpath: ''
 dataset:
   batch_size: 64

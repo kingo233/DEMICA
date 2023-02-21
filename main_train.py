@@ -30,7 +30,7 @@ def main(cfg):
     # deca model
     from decalib.deca import DECA
     from decalib.trainer import Trainer
-    cfg.rasterizer_type = 'pytorch3d'
+    cfg.rasterizer_type = 'standard'
     deca = DECA(cfg)
     trainer = Trainer(model=deca, config=cfg)
 

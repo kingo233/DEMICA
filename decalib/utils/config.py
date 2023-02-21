@@ -52,9 +52,9 @@ cfg.model.max_z = 0.01
 # Options for Dataset
 # ---------------------------------------------------------------------------- #
 cfg.dataset = CN()
-cfg.dataset.training_data = ['vggface2', 'ethnicity']
+cfg.dataset.training_data = ['Stirling']
 # cfg.dataset.training_data = ['ethnicity']
-cfg.dataset.eval_data = ['aflw2000']
+cfg.dataset.eval_data = ['Stirling']
 cfg.dataset.test_data = ['']
 cfg.dataset.batch_size = 2
 cfg.dataset.K = 4
@@ -125,7 +125,7 @@ def update_cfg(cfg, cfg_file):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--cfg', type=str, help='cfg file path')
+    parser.add_argument('--cfg', type=str, help='cfg file path',default='configs/release_version/deca_pretrain.yml')
     parser.add_argument('--mode', type=str, default = 'train', help='deca mode')
 
     args = parser.parse_args()

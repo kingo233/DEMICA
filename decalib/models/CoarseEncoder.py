@@ -43,11 +43,10 @@ class MappingNetwork(nn.Module):
         return output
 
 class CoarseEncoder(nn.Module):
-    def __init__(self,output_dim,pretrained_path,device):
+    def __init__(self,output_dim,pretrained_path=None):
         super().__init__()
-        self.device = device
         self.arcface = Arcface(pretrained_path=pretrained_path)
-        self.regressor = MappingNetwork(512, output_dim, output_dim, 3).to(self.device)
+        self.regressor = MappingNetwork(512, output_dim, output_dim, 3)
     
     def forward(self, x):
         x = self.arcface(x)

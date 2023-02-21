@@ -10,20 +10,21 @@ from skimage.transform import estimate_transform, warp, resize, rescale
 from glob import glob
 
 from .now import NoWDataset
-from .Stirling import StirlingDataset
+# from .Stirling import StirlingDataset
+from .base import BaseDataset
 
 def build_train(config, is_train=True):
     data_list = []
     if 'Stirling' in config.training_data:
-        data_list.append(StirlingDataset(config))
+        data_list.append(BaseDataset('Stirling',config,False))
     dataset = ConcatDataset(data_list)
     
     return dataset
 
 def build_val(config, is_train=True):
     data_list = []
-    if 'now' in config.eval_data:
-        data_list.append(NoWDataset())
+    if 'Stirling' in config.training_data:
+        data_list.append(BaseDataset('Stirling',config,False))
     dataset = ConcatDataset(data_list)
 
     return dataset

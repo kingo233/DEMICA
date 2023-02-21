@@ -44,16 +44,16 @@ class BaseDataset(Dataset, ABC):
         self.face_dict = {}
         self.name = name
         self.min_max_K = 0
-        self.dataset_root = config.root
+        self.dataset_root = 'dataset'
         self.total_images = 0
-        self.image_folder = 'arcface_input'
+        self.image_folder = 'images'
         self.flame_folder = 'FLAME_parameters'
         self.initialize()
 
     def initialize(self):
         logger.info(f'[{self.name}] Initialization')
         # 只要是数据集都会有npy文件
-        image_list_file = f'{os.path.abspath(os.path.dirname(__file__))}/image_paths/{self.name}.npy'
+        image_list_file = f'dataset/image_paths/{str.upper(self.name)}.npy'
         logger.info(f'[{self.name}] Load cached file list: ' + image_list_file)
         self.face_dict = np.load(image_list_file, allow_pickle=True).item()
         self.actors = list(self.face_dict.keys())
@@ -108,7 +108,7 @@ class BaseDataset(Dataset, ABC):
         landmark_list = []
 
         for i in sample_list:
-            image_path = images[i]
+            image_path = sample_list[i]
             img = cv2.imread(image_path)
             # 以下部分是在跑一个人脸检测模型，得到置信分数最高的边界框，然后裁剪
             bboxes, kpss = self.app.det_model.detect(img, max_num=0, metric='default')
