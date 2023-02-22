@@ -209,10 +209,11 @@ class Trainer(object):
             ground_shape_code = ground_shape_code.view(-1,ground_shape_code.shape[-1]).to('cuda:0')
             ground_pose_code = ground_pose_code.view(-1,ground_pose_code.shape[-1]).to('cuda:0')
 
-            ground_flame_verts, landmarks2d_, landmarks3d_ = self.deca.flame(
-                shape_params=ground_shape_code,
-                expression_params=ground_exp_code,
-                pose_params=ground_pose_code)
+            with torch.no_grad():
+                ground_flame_verts, landmarks2d_, landmarks3d_ = self.deca.flame(
+                    shape_params=ground_shape_code,
+                    expression_params=ground_exp_code,
+                    pose_params=ground_pose_code)
             losses['flame'] = (pred_flame_verts - ground_flame_verts).abs()
 
             if self.cfg.model.jaw_type == 'euler':
