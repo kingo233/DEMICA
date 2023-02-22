@@ -214,6 +214,8 @@ class Trainer(object):
                     shape_params=ground_shape_code,
                     expression_params=ground_exp_code,
                     pose_params=ground_pose_code)
+            pred_flame_verts = pred_flame_verts.view(-1,pred_flame_verts.shape[-1])
+            ground_flame_verts = ground_flame_verts.view(-1,ground_flame_verts.shape[-1])
             losses['flame'] = (pred_flame_verts - ground_flame_verts).abs()
 
             if self.cfg.model.jaw_type == 'euler':
