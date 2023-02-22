@@ -130,19 +130,21 @@ class BaseDataset(Dataset, ABC):
                 kps = kpss[i]
 
             face = Face(bbox=bbox, kps=kps, det_score=det_score)
+            # 获得裁剪的112*112输出，arcface用于粗糙模型，对应arcface
             arcface = face_align.norm_crop(img, landmark=face.kps, image_size=224)
             arcface = arcface / 255.0
             detail_input = arcface
             arcface = cv2.resize(arcface,(112,112))
             arcface = np.transpose(arcface,(2,0,1))
+            # 224 * 224对应images，是detail encoder输入
             detail_input = np.transpose(detail_input,(2,0,1))
             image_list.append(detail_input)
             arcface_list.append(arcface)
 
-            # 获得 landmarks
-            landmark = self.fan.model.get_landmarks(img)
+            # 获得 landmarks，针对粗糙模型的，也即112*112的arcface
+            landmark = self.fan.model.get_landmarks(arcface * 255)
             # 归一到[-1,1]
-            landmark[0] = landmark[0] / img.shape[0] * 2 - 1
+            landmark[0] = landmark[0] / 112 * 2 - 1
             # 堆叠[68,2] ->[68,3]
             landmark[0] = np.hstack([landmark[0],np.ones([68,1],dtype=np.float32)])
 
