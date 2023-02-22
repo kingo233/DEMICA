@@ -144,7 +144,7 @@ class BaseDataset(Dataset, ABC):
             # 归一到[-1,1]
             landmark[0] = landmark[0] / img.shape[0] * 2 - 1
             # 堆叠[68,2] ->[68,3]
-            landmark[0] = np.hstack([landmark[0],np.ones(68,1)])
+            landmark[0] = np.hstack([landmark[0],np.ones([68,1],dtype=np.float32)])
 
             landmark_list.append(landmark[0])
 
