@@ -142,6 +142,7 @@ class BaseDataset(Dataset, ABC):
             arcface_list.append(arcface)
 
             # 获得 landmarks，针对粗糙模型的，也即112*112的arcface
+            arcface = np.transpose(arcface,(1,2,0))
             landmark = self.fan.model.get_landmarks(arcface * 255)
             # 归一到[-1,1]
             landmark[0] = landmark[0] / 112 * 2 - 1
