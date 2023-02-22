@@ -312,7 +312,7 @@ class Trainer(object):
         except:
             self.val_iter = iter(self.val_dataloader)
             batch = next(self.val_iter)
-        images = batch['image'].to(self.device); images = images.view(-1, images.shape[-3], images.shape[-2], images.shape[-1])
+        images = batch['images'].to(self.device); images = images.view(-1, images.shape[-3], images.shape[-2], images.shape[-1])
         arcfaces = batch['mask'].to(self.device); arcfaces = arcfaces.view(-1,images.shape[-3], arcfaces.shape[-2], arcfaces.shape[-1]) 
         with torch.no_grad():
             codedict = self.deca.encode(images,arcfaces)

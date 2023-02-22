@@ -141,6 +141,8 @@ class BaseDataset(Dataset, ABC):
 
             # 获得 landmarks
             landmark = self.fan.model.get_landmarks(img)
+            # 归一到[-1,1]
+            landmark[0] = landmark[0] / img.shape[0] * 2 - 1
             landmark_list.append(landmark[0])
 
             # 获得mask
