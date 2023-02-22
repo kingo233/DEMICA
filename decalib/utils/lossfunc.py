@@ -8,6 +8,7 @@ import torchvision.models as models
 import cv2
 import torchfile
 from torch.autograd import Variable
+from loguru import logger
 
 from . import util
 
@@ -196,6 +197,8 @@ def weighted_landmark_loss(predicted_landmarks, landmarks_gt, weight=1.):
     #smaller inner landmark weights
     # (predicted_theta, predicted_verts, predicted_landmarks) = ringnet_outputs[-1]
     # import ipdb; ipdb.set_trace()
+    logger.info(f"pred landmarks {predicted_landmarks.shape}")
+    logger.info(f"landmarks_gt {landmarks_gt.shape}")
     real_2d = landmarks_gt
     weights = torch.ones((68,)).cuda()
     weights[5:7] = 2
