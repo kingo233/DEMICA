@@ -2,17 +2,23 @@
 #
 # Max-Planck-Gesellschaft zur Förderung der Wissenschaften e.V. (MPG) is
 # holder of all proprietary rights on this computer program.
-# Using this computer program means that you agree to the terms 
-# in the LICENSE file included with this software distribution. 
-# Any use not explicitly granted by the LICENSE is prohibited.
+# You can only use this computer program if you have closed
+# a license agreement with MPG or you get the right to use the computer
+# program from someone who is authorized to grant you that right.
+# Any use of the computer program without a valid license is prohibited and
+# liable to prosecution.
 #
-# Copyright©2019 Max-Planck-Gesellschaft zur Förderung
+# Copyright©2022 Max-Planck-Gesellschaft zur Förderung
 # der Wissenschaften e.V. (MPG). acting on behalf of its Max Planck Institute
 # for Intelligent Systems. All rights reserved.
 #
 # For comments or questions, please email us at deca@tue.mpg.de
 # For commercial licensing contact, please contact ps-license@tuebingen.mpg.de
 
+
+import pickle
+
+import loguru
 import torch
 import torch.nn as nn
 import numpy as np
@@ -21,18 +27,23 @@ import torch.nn.functional as F
 
 from .lbs import lbs, batch_rodrigues, vertices2landmarks, rot_mat_to_euler
 
+
 def to_tensor(array, dtype=torch.float32):
     if 'torch.tensor' not in str(type(array)):
         return torch.tensor(array, dtype=dtype)
+
+
 def to_np(array, dtype=np.float32):
     if 'scipy.sparse' in str(type(array)):
         array = array.todense()
     return np.array(array, dtype=dtype)
 
+
 class Struct(object):
     def __init__(self, **kwargs):
         for key, val in kwargs.items():
             setattr(self, key, val)
+
 
 class FLAME(nn.Module):
     """
@@ -40,38 +51,47 @@ class FLAME(nn.Module):
     Given flame parameters this class generates a differentiable FLAME function
     which outputs the a mesh and 2D/3D facial landmarks
     """
-    def __init__(self, config):
+
+    def __init__(self, config, optimize_basis=False):
         super(FLAME, self).__init__()
-        print("creating the FLAME Decoder")
+        loguru.logger.info("[FLAME] creating the FLAME Decoder")
         with open(config.flame_model_path, 'rb') as f:
             ss = pickle.load(f, encoding='latin1')
             flame_model = Struct(**ss)
 
+        self.optimize_basis = optimize_basis
+        self.cfg = config
         self.dtype = torch.float32
         self.register_buffer('faces_tensor', to_tensor(to_np(flame_model.f, dtype=np.int64), dtype=torch.long))
         # The vertices of the template model
         self.register_buffer('v_template', to_tensor(to_np(flame_model.v_template), dtype=self.dtype))
+        self.n_vertices = self.v_template.shape[0]
         # The shape components and expression
         shapedirs = to_tensor(to_np(flame_model.shapedirs), dtype=self.dtype)
-        shapedirs = torch.cat([shapedirs[:,:,:config.n_shape], shapedirs[:,:,300:300+config.n_exp]], 2)
-        self.register_buffer('shapedirs', shapedirs)
+        shapedirs = torch.cat([shapedirs[:, :, :config.n_shape], shapedirs[:, :, 300:]], 2)
+
+        if optimize_basis:
+            self.register_parameter('shapedirs', torch.nn.Parameter(shapedirs))
+        else:
+            self.register_buffer('shapedirs', shapedirs)
+
+        self.n_shape = config.n_shape
         # The pose components
         num_pose_basis = flame_model.posedirs.shape[-1]
         posedirs = np.reshape(flame_model.posedirs, [-1, num_pose_basis]).T
         self.register_buffer('posedirs', to_tensor(to_np(posedirs), dtype=self.dtype))
         # 
         self.register_buffer('J_regressor', to_tensor(to_np(flame_model.J_regressor), dtype=self.dtype))
-        parents = to_tensor(to_np(flame_model.kintree_table[0])).long(); parents[0] = -1
+        parents = to_tensor(to_np(flame_model.kintree_table[0])).long();
+        parents[0] = -1
         self.register_buffer('parents', parents)
         self.register_buffer('lbs_weights', to_tensor(to_np(flame_model.weights), dtype=self.dtype))
 
         # Fixing Eyeball and neck rotation
         default_eyball_pose = torch.zeros([1, 6], dtype=self.dtype, requires_grad=False)
-        self.register_parameter('eye_pose', nn.Parameter(default_eyball_pose,
-                                                         requires_grad=False))
+        self.register_parameter('eye_pose', nn.Parameter(default_eyball_pose, requires_grad=False))
         default_neck_pose = torch.zeros([1, 3], dtype=self.dtype, requires_grad=False)
-        self.register_parameter('neck_pose', nn.Parameter(default_neck_pose,
-                                                          requires_grad=False))
+        self.register_parameter('neck_pose', nn.Parameter(default_neck_pose, requires_grad=False))
 
         # Static and Dynamic Landmark embeddings for FLAME
         lmk_embeddings = np.load(config.flame_lmk_embedding_path, allow_pickle=True, encoding='latin1')
@@ -83,13 +103,14 @@ class FLAME(nn.Module):
         self.register_buffer('full_lmk_faces_idx', torch.from_numpy(lmk_embeddings['full_lmk_faces_idx']).long())
         self.register_buffer('full_lmk_bary_coords', torch.from_numpy(lmk_embeddings['full_lmk_bary_coords']).to(self.dtype))
 
-        neck_kin_chain = []; NECK_IDX=1
+        neck_kin_chain = [];
+        NECK_IDX = 1
         curr_idx = torch.tensor(NECK_IDX, dtype=torch.long)
         while curr_idx != -1:
             neck_kin_chain.append(curr_idx)
             curr_idx = self.parents[curr_idx]
         self.register_buffer('neck_kin_chain', torch.stack(neck_kin_chain))
-        
+
     def _find_dynamic_lmk_idx_and_bcoords(self, pose, dynamic_lmk_faces_idx,
                                           dynamic_lmk_b_coords,
                                           neck_kin_chain, dtype=torch.float32):

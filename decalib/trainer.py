@@ -205,9 +205,9 @@ class Trainer(object):
             ground_shape_code = ground_flame_para['shape_params']
             ground_pose_code = ground_flame_para['pose_params']
 
-            ground_exp_code = ground_exp_code.view(-1,ground_exp_code.shape[-1])
-            ground_shape_code = ground_shape_code.view(-1,ground_shape_code.shape[-1])
-            ground_pose_code = ground_pose_code.view(-1,ground_pose_code.shape[-1])
+            ground_exp_code = ground_exp_code.view(-1,ground_exp_code.shape[-1]).to('cuda:0')
+            ground_shape_code = ground_shape_code.view(-1,ground_shape_code.shape[-1]).to('cuda:0')
+            ground_pose_code = ground_pose_code.view(-1,ground_pose_code.shape[-1]).to('cuda:0')
 
             ground_flame_verts, landmarks2d_, landmarks3d_ = self.deca.flame(
                 shape_params=ground_shape_code,
