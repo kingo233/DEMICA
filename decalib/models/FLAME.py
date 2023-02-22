@@ -184,9 +184,9 @@ class FLAME(nn.Module):
         """
         batch_size = shape_params.shape[0]
         if pose_params is None:
-            pose_params = self.eye_pose.expand(batch_size, -1)
+            pose_params = self.eye_pose.expand(batch_size, -1).to('cuda:0')
         if eye_pose_params is None:
-            eye_pose_params = self.eye_pose.expand(batch_size, -1)
+            eye_pose_params = self.eye_pose.expand(batch_size, -1).to('cuda:0')
         betas = torch.cat([shape_params, expression_params], dim=1)
         full_pose = torch.cat([pose_params[:, :3], self.neck_pose.expand(batch_size, -1), pose_params[:, 3:], eye_pose_params], dim=1)
         template_vertices = self.v_template.unsqueeze(0).expand(batch_size, -1, -1)
