@@ -406,8 +406,13 @@ class Trainer(object):
     def fit(self):
         self.prepare_data()
 
-        iters_every_epoch = int(len(self.train_dataset)/self.batch_size)
+        import math
+        # 每个epoch 包含的batch数
+        iters_every_epoch = math.ceil(len(self.train_dataset)/self.batch_size)
+        logger.info(f"every epoch contains {iters_every_epoch} batch(s)")
+        # 已经训练了多少个batch/每个epoch有多少个batch
         start_epoch = self.global_step//iters_every_epoch
+        logger.info(f"global step = {self.global_step},strat epoch = {start_epoch}")
         for epoch in range(start_epoch, self.cfg.train.max_epochs):
             # for step, batch in enumerate(tqdm(self.train_dataloader, desc=f"Epoch: {epoch}/{self.cfg.train.max_epochs}")):
             for step in tqdm(range(iters_every_epoch), desc=f"Epoch[{epoch+1}/{self.cfg.train.max_epochs}]"):
