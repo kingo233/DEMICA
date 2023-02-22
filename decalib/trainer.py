@@ -201,13 +201,18 @@ class Trainer(object):
             losses['light_reg'] = ((torch.mean(codedict['light'], dim=2)[:,:,None] - codedict['light'])**2).mean()*self.cfg.loss.reg_light
 
             ground_flame_para = batch['flame']
-            exp_code = ground_flame_para['expression_params']
-            exp_code = torch.cat([exp_code,exp_code,exp_code],dim=2)
-            print(f'expcode.shape = {exp_code.shape}')
-            print(f"shape param = {ground_flame_para['shape_params'].shape}")
+            ground_exp_code = ground_flame_para['expression_params']
+            ground_shape_code = ground_flame_para['shape_params']
+            ground_pose_code = ground_flame_para['pose_params']
+
+            ground_exp_code = ground_exp_code.view(-1,ground_exp_code.shape[-1])
+            ground_shape_code = ground_shape_code.view(-1,ground_shape_code.shape[-1])
+            ground_pose_code = ground_pose_code.view(-1,ground_pose_code.shape[-1])
+
             ground_flame_verts, landmarks2d_, landmarks3d_ = self.deca.flame(
-                shape_params=ground_flame_para['shape_params'], # 300
-                expression_params=exp_code)
+                shape_params=ground_shape_code,
+                expression_params=ground_exp_code,
+                pose_params=ground_pose_code)
             losses['flame'] = (pred_flame_verts - ground_flame_verts).abs()
 
             if self.cfg.model.jaw_type == 'euler':
