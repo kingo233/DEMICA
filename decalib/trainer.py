@@ -221,7 +221,7 @@ class Trainer(object):
             ground_flame_verts = ground_flame_verts.reshape(real_batch_size,5023*3)
             pred_flame_verts = pred_flame_verts.permute(1,0,2)
             
-            losses['flame'] = (pred_flame_verts - ground_flame_verts).abs().mean()
+            losses['flame'] = (pred_flame_verts - ground_flame_verts).abs().mean() * 1000.0
 
             if self.cfg.model.jaw_type == 'euler':
                 # import ipdb; ipdb.set_trace()
@@ -457,11 +457,11 @@ class Trainer(object):
                         os.makedirs(os.path.join(self.cfg.output_dir, 'models'), exist_ok=True)
                         torch.save(model_dict, os.path.join(self.cfg.output_dir, 'models', f'{self.global_step:08}.tar'))   
 
-                if self.global_step % self.cfg.train.val_steps == 0:
-                    self.validation_step()
+                # if self.global_step % self.cfg.train.val_steps == 0:
+                #     self.validation_step()
                 
-                if self.global_step % self.cfg.train.eval_steps == 0:
-                    self.evaluate()
+                # if self.global_step % self.cfg.train.eval_steps == 0:
+                #     self.evaluate()
 
                 all_loss = losses['all_loss']
                 self.opt.zero_grad(); all_loss.backward(); self.opt.step()
