@@ -214,9 +214,11 @@ class Trainer(object):
                     shape_params=ground_shape_code,
                     expression_params=ground_exp_code,
                     pose_params=ground_pose_code)
-            pred_flame_verts = pred_flame_verts.view(-1,pred_flame_verts.shape[-1])
+            # pred_flame_verts shape[batch_size*K,5023,3]
+            # ground_flame_verts shape[batch_size,5023,3]
+            pred_flame_verts = pred_flame_verts.view(batch_size,pred_flame_verts.shape[0] / batch_size,pred_flame_verts.shape[-1])
             ground_flame_verts = ground_flame_verts.view(-1,ground_flame_verts.shape[-1])
-            losses['flame'] = (pred_flame_verts - ground_flame_verts).abs()
+            losses['flame'] = (pred_flame_verts - ground_flame_verts).abs().mean()
 
             if self.cfg.model.jaw_type == 'euler':
                 # import ipdb; ipdb.set_trace()
