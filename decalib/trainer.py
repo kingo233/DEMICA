@@ -200,13 +200,13 @@ class Trainer(object):
             losses['tex_reg'] = (torch.sum(codedict['tex']**2)/2)*self.cfg.loss.reg_tex
             losses['light_reg'] = ((torch.mean(codedict['light'], dim=2)[:,:,None] - codedict['light'])**2).mean()*self.cfg.loss.reg_light
 
-            # ground_flame_para = batch['flame']
-            # exp_code = ground_flame_para['expression_params']
-            # exp_code = torch.cat([exp_code,exp_code,exp_code],dim=0)
-            # ground_flame_verts, landmarks2d_, landmarks3d_ = self.deca.flame(
-            #     shape_params=ground_flame_para['shape_params'], # 300
-            #     expression_params=exp_code)
-            # losses['flame'] = (pred_flame_verts - ground_flame_verts).abs()
+            ground_flame_para = batch['flame']
+            exp_code = ground_flame_para['expression_params']
+            exp_code = torch.cat([exp_code,exp_code,exp_code],dim=0)
+            ground_flame_verts, landmarks2d_, landmarks3d_ = self.deca.flame(
+                shape_params=ground_flame_para['shape_params'], # 300
+                expression_params=exp_code)
+            losses['flame'] = (pred_flame_verts - ground_flame_verts).abs()
 
             if self.cfg.model.jaw_type == 'euler':
                 # import ipdb; ipdb.set_trace()
