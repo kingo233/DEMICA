@@ -143,6 +143,9 @@ class BaseDataset(Dataset, ABC):
             landmark = self.fan.model.get_landmarks(img)
             # 归一到[-1,1]
             landmark[0] = landmark[0] / img.shape[0] * 2 - 1
+            # 堆叠[68,2] ->[68,3]
+            landmark[0] = np.hstack([landmark[0],np.ones(68,1)])
+
             landmark_list.append(landmark[0])
 
             # 获得mask
