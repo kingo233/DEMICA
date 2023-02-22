@@ -113,6 +113,7 @@ class Trainer(object):
             self.deca.E_flame.eval()
         # [B, K, 3, size, size] ==> [BxK, 3, size, size]
         # images是arcface input
+        real_batch_size = batch['images'].shape[0]
         images = batch['images'].to(self.device); images = images.view(-1, images.shape[-3], images.shape[-2], images.shape[-1]) 
         lmk = batch['landmark'].to(self.device); lmk = lmk.view(-1, lmk.shape[-2], lmk.shape[-1])
         masks = batch['mask'].to(self.device); masks = masks.view(-1, images.shape[-2], images.shape[-1]) 
@@ -216,8 +217,8 @@ class Trainer(object):
                     pose_params=ground_pose_code)
             # pred_flame_verts shape[batch_size*K,5023,3] ->[batch_size,K,5023*3] ->[K,batch_size,5023*3]
             # ground_flame_verts shape[batch_size,5023,3] ->[batch_size,5023*3]
-            pred_flame_verts = pred_flame_verts.view(batch_size,pred_flame_verts.shape[0] // batch_size, -1)
-            ground_flame_verts = ground_flame_verts.view(batch_size,-1)
+            pred_flame_verts = pred_flame_verts.reshape(real_batch_size,pred_flame_verts.shape[0] // real_batch_size, 5023*3)
+            ground_flame_verts = ground_flame_verts.reshape(real_batch_size,5023*3)
             pred_flame_verts = pred_flame_verts.permute(1,0,2)
             
             losses['flame'] = (pred_flame_verts - ground_flame_verts).abs().mean()
