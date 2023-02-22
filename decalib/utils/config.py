@@ -31,6 +31,7 @@ cfg.model.face_eye_mask_path = os.path.join(cfg.deca_dir, 'data', 'uv_face_eye_m
 cfg.model.mean_tex_path = os.path.join(cfg.deca_dir, 'data', 'mean_texture.jpg') 
 cfg.model.tex_path = os.path.join(cfg.deca_dir, 'data', 'FLAME_albedo_from_BFM.npz') 
 cfg.model.tex_type = 'BFM' # BFM, FLAME, albedoMM
+cfg.model.extract_tex=True
 cfg.model.uv_size = 256
 cfg.model.param_list = ['shape', 'tex', 'exp', 'pose', 'cam', 'light']
 cfg.model.n_shape = 300
