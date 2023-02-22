@@ -203,6 +203,8 @@ class Trainer(object):
             ground_flame_para = batch['flame']
             exp_code = ground_flame_para['expression_params']
             exp_code = torch.cat([exp_code,exp_code,exp_code],dim=0)
+            print(f'expcode.shape = {expcode.shape}')
+            print(f"shape param = {ground_flame_para['shape_params'].shape}")
             ground_flame_verts, landmarks2d_, landmarks3d_ = self.deca.flame(
                 shape_params=ground_flame_para['shape_params'], # 300
                 expression_params=exp_code)
