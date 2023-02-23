@@ -117,7 +117,9 @@ class BaseDataset(Dataset, ABC):
         for i in sample_list:
             image_path = images_path[i]
             mask_path = masks_path[i]
+            # w * h * 3
             img = cv2.imread(str(image_path))
+            img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
             # 以下部分是在跑一个人脸检测模型，得到置信分数最高的边界框，然后裁剪
             bboxes, kpss = self.app.det_model.detect(img, max_num=0, metric='default')
             if bboxes.shape[0] == 0:

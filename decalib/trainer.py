@@ -408,7 +408,6 @@ class Trainer(object):
         start_epoch = self.global_step//iters_every_epoch
         logger.info(f"global step = {self.global_step},strat epoch = {start_epoch}")
         for epoch in range(start_epoch, self.cfg.train.max_epochs):
-            self.opt.zero_grad()
             train_loss_list = []
             grads_dict = {}
             abs_grads_dict = {}
@@ -473,6 +472,7 @@ class Trainer(object):
                 train_loss_list.append(all_loss)
                 all_loss.backward() 
                 self.opt.step()
+                self.opt.zero_grad()
                 for grad_name,params in self.deca.named_parameters():
                     if params.grad is None:
                         continue
