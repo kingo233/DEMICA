@@ -13,7 +13,7 @@ cfg.deca_dir = abs_deca_dir
 cfg.device = 'cuda'
 cfg.device_id = '0'
 
-cfg.pretrained_modelpath = os.path.join(cfg.deca_dir, 'data', 'deca_model.tar')
+cfg.pretrained_modelpath = os.path.join(cfg.deca_dir, 'data', 'demica.tar')
 cfg.output_dir = ''
 cfg.rasterizer_type = 'pytorch3d'
 # ---------------------------------------------------------------------------- #
@@ -42,8 +42,12 @@ cfg.model.n_pose = 6
 cfg.model.n_light = 27
 cfg.model.use_tex = True
 cfg.model.jaw_type = 'aa' # default use axis angle, another option: euler. Note that: aa is not stable in the beginning
-# face recognition model
+# face recognition model for loss
 cfg.model.fr_model_path = os.path.join(cfg.deca_dir, 'data', 'resnet50_ft_weight.pkl')
+# arcface model 
+cfg.model.arcface_model_path = os.path.join(cfg.deca_dir, 'data', 'arcface-backbone100.pth')
+# deca model to initialize E_detail and D_detail
+cfg.model.deca_model_path = os.path.join(cfg.deca_dir, 'data', 'deca_model.tar')
 
 ## details
 cfg.model.n_detail = 128

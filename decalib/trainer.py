@@ -97,12 +97,6 @@ class Trainer(object):
             self.global_step = checkpoint['global_step']
             logger.info(f"resume training from {os.path.join(self.cfg.output_dir, 'model.tar')}")
             logger.info(f"training start from step {self.global_step}")
-        # load model weights only
-        elif os.path.exists(self.cfg.pretrained_modelpath):
-            checkpoint = torch.load(self.cfg.pretrained_modelpath)
-            key = 'E_flame'
-            util.copy_state_dict(model_dict[key], checkpoint[key])
-            self.global_step = 0
         else:
             logger.info('model path not found, start training from scratch')
             self.global_step = 0

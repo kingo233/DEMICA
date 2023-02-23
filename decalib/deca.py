@@ -34,6 +34,7 @@ from .utils.rotation_converter import batch_euler2axis
 from .utils.tensor_cropper import transform_points
 from .datasets import datasets
 from .utils.config import cfg
+from loguru import logger
 torch.backends.cudnn.benchmark = True
 
 class DECA(nn.Module):
@@ -76,8 +77,9 @@ class DECA(nn.Module):
         self.param_dict = {i:model_cfg.get('n_' + i) for i in model_cfg.param_list}
 
         # encoders
+        # 默认情况下，是分别载入deca和E_detail和D_detail,以及mica所使用的arcface
         # 输入大小112 * 112,数据范围归一到[-1,1]
-        self.E_flame = CoarseEncoder(output_dim=self.n_param).to(self.device)
+        self.E_flame = CoarseEncoder(output_dim=self.n_param,arcface_pretrained_path=model_cfg.arcface_model_path).to(self.device)
         # 输入大小224 * 224,数据范围归一化到[0,1]
         self.E_detail = ResnetEncoder(outsize=self.n_detail).to(self.device)
         # decoders
@@ -85,17 +87,25 @@ class DECA(nn.Module):
         if model_cfg.use_tex:
             self.flametex = FLAMETex(model_cfg).to(self.device)
         self.D_detail = Generator(latent_dim=self.n_detail+self.n_cond, out_channels=1, out_scale=model_cfg.max_z, sample_mode = 'bilinear').to(self.device)
+
+        deca_path = model_cfg.deca_model_path
+        if os.path.exists(deca_path):
+            logger.info(f"DECA model found,use E_detail and D_tail in {deca_path}")
+            old_deca = torch.load(deca_path)
+            util.copy_state_dict(self.E_detail.state_dict(), old_deca['E_detail'])
+            util.copy_state_dict(self.D_detail.state_dict(), old_deca['D_detail'])
+
         # resume model
         model_path = self.cfg.pretrained_modelpath
         if os.path.exists(model_path):
-            print(f'trained model found. load {model_path}')
+            logger.info(f'trained demica model found. load {model_path}')
             checkpoint = torch.load(model_path)
             self.checkpoint = checkpoint
             util.copy_state_dict(self.E_flame.state_dict(), checkpoint['E_flame'])
             util.copy_state_dict(self.E_detail.state_dict(), checkpoint['E_detail'])
             util.copy_state_dict(self.D_detail.state_dict(), checkpoint['D_detail'])
         else:
-            print(f'please check model path: {model_path}')
+            logger.info(f'please check model path: {model_path}')
             # exit()
         # eval mode
         self.E_flame.eval()
