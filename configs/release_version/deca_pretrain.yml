@@ -27,6 +27,6 @@ train:
   max_epochs: 500
   max_steps: 100000
   vis_steps: 10
-  checkpoint_steps: 1000
+  checkpoint_steps: 60
   val_steps: 500
   eval_steps: 1000

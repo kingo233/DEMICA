@@ -78,6 +78,7 @@ cfg.train.train_detail = False
 cfg.train.max_epochs = 500
 cfg.train.max_steps = 1000000
 cfg.train.lr = 1e-4
+cfg.train.decay = 0.0001
 cfg.train.log_dir = 'logs'
 cfg.train.log_steps = 10
 cfg.train.vis_dir = 'train_images'

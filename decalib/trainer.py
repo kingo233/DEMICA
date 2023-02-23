@@ -78,11 +78,13 @@ class Trainer(object):
                                 list(self.deca.E_detail.parameters()) + \
                                 list(self.deca.D_detail.parameters())  ,
                                 lr=self.cfg.train.lr,
+                                weight_decay=self.cfg.train.decay,
                                 amsgrad=False)
         else:
             self.opt = torch.optim.Adam(
                                     self.deca.E_flame.parameters(),
                                     lr=self.cfg.train.lr,
+                                    weight_decay=self.cfg.train.decay,
                                     amsgrad=False)
     def load_checkpoint(self):
         model_dict = self.deca.model_dict()
