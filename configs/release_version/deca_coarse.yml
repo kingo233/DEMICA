@@ -6,8 +6,8 @@
 # Time:
 # around 15min/1000iterations
 # in total, needs around 
-output_dir: "/ps/scratch/yfeng/Data/Projects-data/DECA-training/training/DECA_release_version/coarse"
-pretrained_modelpath: "/ps/scratch/yfeng/Data/Projects-data/DECA-training/training/DECA_release_version/pretrain/model.tar"
+output_dir: "logs/coarse"
+pretrained_modelpath: "logs/pretrain/model.tar"
 dataset:
   batch_size: 8
   K: 2
