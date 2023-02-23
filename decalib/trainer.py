@@ -328,7 +328,7 @@ class Trainer(object):
             opdict, visdict = self.deca.decode(codedict)
         savepath = os.path.join(self.cfg.output_dir, self.cfg.train.val_vis_dir, f'{self.global_step:08}.jpg')
         grid_image = util.visualize_grid(visdict, savepath, return_gird=True)
-        self.writer.add_image('val_images', (grid_image/255.).astype(np.float32).transpose(2,0,1), self.global_step)
+        # self.writer.add_image('val_images', (grid_image/255.).astype(np.float32).transpose(2,0,1), self.global_step)
         self.deca.train()
 
     def evaluate(self):
@@ -412,6 +412,7 @@ class Trainer(object):
             grads_dict = {}
             abs_grads_dict = {}
             part_loss_dict = {}
+            self.opt.zero_grad()
             for step in tqdm(range(iters_every_epoch), desc=f"Epoch[{epoch+1}/{self.cfg.train.max_epochs}]"):
                 if epoch*iters_every_epoch + step < self.global_step:
                     continue
@@ -449,7 +450,7 @@ class Trainer(object):
                     savepath = os.path.join(self.cfg.output_dir, self.cfg.train.vis_dir, f'{self.global_step:06}.jpg')
                     grid_image = util.visualize_grid(visdict, savepath, return_gird=True)
                     # import ipdb; ipdb.set_trace()                    
-                    self.writer.add_image('train_images', (grid_image/255.).astype(np.float32).transpose(2,0,1), self.global_step)
+                    # self.writer.add_image('train_images', (grid_image/255.).astype(np.float32).transpose(2,0,1), self.global_step)
 
                 if self.global_step>0 and self.global_step % self.cfg.train.checkpoint_steps == 0:
                     model_dict = self.deca.model_dict()
@@ -472,7 +473,7 @@ class Trainer(object):
                 train_loss_list.append(all_loss)
                 all_loss.backward() 
                 self.opt.step()
-                self.opt.zero_grad()
+                # self.opt.zero_grad()
                 for grad_name,params in self.deca.named_parameters():
                     if params.grad is None:
                         continue
@@ -488,6 +489,8 @@ class Trainer(object):
             
             train_loss = torch.tensor(train_loss_list,requires_grad=False).mean()
             logger.info(f"{self.cfg.exp_name} : Epoch: {epoch}, Time: {datetime.now().strftime('%Y-%m-%d-%H:%M:%S')},train_loss = {train_loss.item():.4f}\n")
+
+            self.validation_step()
 
             # tensorboard
             self.writer.add_scalar('train_loss', train_loss, epoch)
