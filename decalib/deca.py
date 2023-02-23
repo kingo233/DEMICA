@@ -79,7 +79,8 @@ class DECA(nn.Module):
         # encoders
         # 默认情况下，是分别载入deca和E_detail和D_detail,以及mica所使用的arcface
         # 输入大小112 * 112,数据范围归一到[-1,1]
-        self.E_flame = CoarseEncoder(output_dim=self.n_param,arcface_pretrained_path=model_cfg.arcface_model_path).to(self.device)
+        # self.E_flame = CoarseEncoder(output_dim=self.n_param,arcface_pretrained_path=model_cfg.arcface_model_path).to(self.device)
+        self.E_flame = ResnetEncoder(outsize=self.n_param).to(self.device)
         # 输入大小224 * 224,数据范围归一化到[0,1]
         self.E_detail = ResnetEncoder(outsize=self.n_detail).to(self.device)
         # decoders
