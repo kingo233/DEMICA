@@ -41,7 +41,7 @@ from .utils import lossfunc
 from .datasets import build_datasets
 
 class Trainer(object):
-    def __init__(self, model, config=None, device='cuda:0'):
+    def __init__(self, model:nn.Module, config=None, device='cuda:0'):
         if config is None:
             self.cfg = cfg
         else:
@@ -408,7 +408,11 @@ class Trainer(object):
         start_epoch = self.global_step//iters_every_epoch
         logger.info(f"global step = {self.global_step},strat epoch = {start_epoch}")
         for epoch in range(start_epoch, self.cfg.train.max_epochs):
-            # for step, batch in enumerate(tqdm(self.train_dataloader, desc=f"Epoch: {epoch}/{self.cfg.train.max_epochs}")):
+            self.opt.zero_grad()
+            train_loss_list = []
+            grads_dict = {}
+            abs_grads_dict = {}
+            part_loss_dict = {}
             for step in tqdm(range(iters_every_epoch), desc=f"Epoch[{epoch+1}/{self.cfg.train.max_epochs}]"):
                 if epoch*iters_every_epoch + step < self.global_step:
                     continue
@@ -418,12 +422,15 @@ class Trainer(object):
                     self.train_iter = iter(self.train_dataloader)
                     batch = next(self.train_iter)
                 losses, opdict = self.training_step(batch, step)
+
+                # 每个batch的每个部分loss都保存
+                for k,v in losses.items():
+                    if k not in part_loss_dict:
+                        part_loss_dict[k] = []
+                    part_loss_dict[k].append(v)
+                
                 if self.global_step % self.cfg.train.log_steps == 0:
-                    loss_info = f"ExpName: {self.cfg.exp_name} \nEpoch: {epoch}, Iter: {step}/{iters_every_epoch}, Time: {datetime.now().strftime('%Y-%m-%d-%H:%M:%S')} \n"
-                    for k, v in losses.items():
-                        loss_info = loss_info + f'{k}: {v:.4f}, '
-                        if self.cfg.train.write_summary:
-                            self.writer.add_scalar('train_loss/'+k, v, global_step=self.global_step)                    
+                    loss_info = f"ExpName: {self.cfg.exp_name} \nEpoch: {epoch}, Iter: {step}/{iters_every_epoch}, Time: {datetime.now().strftime('%Y-%m-%d-%H:%M:%S')} \n"                 
                     logger.info(loss_info)
 
                 if self.global_step % self.cfg.train.vis_steps == 0:
@@ -463,7 +470,29 @@ class Trainer(object):
                 #     self.evaluate()
 
                 all_loss = losses['all_loss']
-                self.opt.zero_grad(); all_loss.backward(); self.opt.step()
+                train_loss_list.append(all_loss)
+                all_loss.backward() 
+                self.opt.step()
+                for grad_name,params in self.deca.named_parameters():
+                    if params.grad is None:
+                        continue
+                    if grad_name not in grads_dict:
+                        grads_dict[grad_name] = []
+                        abs_grads_dict[grad_name] = []
+                    grads_dict[grad_name].append(params.grad.mean())
+                    abs_grads_dict[grad_name].append(params.grad.abs().mean())
+
                 self.global_step += 1
                 if self.global_step > self.cfg.train.max_steps:
                     break
+            
+            train_loss = torch.tensor(train_loss_list,requires_grad=False).mean()
+            logger.info(f"{self.cfg.exp_name} : Epoch: {epoch}, Time: {datetime.now().strftime('%Y-%m-%d-%H:%M:%S')},train_loss = {train_loss.item():.4f}\n")
+
+            # tensorboard
+            self.writer.add_scalar('train_loss', train_loss, epoch)
+            for grad_name in grads_dict:
+                self.writer.add_scalar(f'grad_{grad_name}',torch.tensor(grads_dict[grad_name],requires_grad=False).mean(), epoch)
+                self.writer.add_scalar(f'abs_grad_{grad_name}', torch.tensor(abs_grads_dict[grad_name],requires_grad=False).mean(), epoch)
+            for loss_name in part_loss_dict:
+                self.writer.add_scalar(f'loss_{loss_name}', torch.tensor(part_loss_dict[loss_name],requires_grad=False).mean(), epoch)

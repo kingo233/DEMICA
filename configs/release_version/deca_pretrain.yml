@@ -26,7 +26,6 @@ train:
   resume: False
   max_epochs: 500
   max_steps: 100000
-  log_steps: 10
   vis_steps: 10
   checkpoint_steps: 1000
   val_steps: 500
