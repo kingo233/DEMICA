@@ -13,7 +13,7 @@
 output_dir: "logs/pretrain"
 pretrained_modelpath: ''
 dataset:
-  batch_size: 64
+  batch_size: 32
   K: 2
 loss:
   photo: 0.
