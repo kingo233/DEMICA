@@ -214,7 +214,7 @@ class Trainer(object):
             # pred_flame_verts shape[batch_size*K,5023,3] ->[batch_size,K,5023*3] ->[K,batch_size,5023*3]
             # ground_flame_verts shape[batch_size,5023,3] ->[batch_size,5023*3]
             pred_flame_verts = pred_flame_verts.reshape(real_batch_size,pred_flame_verts.shape[0] // real_batch_size, 5023*3)
-            ground_flame_verts = ground_flame_verts.reshape(-1,5023*3)
+            ground_flame_verts = ground_flame_verts.reshape(real_batch_size,5023*3)
             pred_flame_verts = pred_flame_verts.permute(1,0,2)
             
             losses['flame'] = (pred_flame_verts - ground_flame_verts).abs().mean() * 1000.0
