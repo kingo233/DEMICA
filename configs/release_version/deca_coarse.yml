@@ -7,7 +7,7 @@
 # around 15min/1000iterations
 # in total, needs around 
 output_dir: "logs/coarse"
-pretrained_modelpath: "logs/pretrain/model.tar"
+pretrained_modelpath: "logs/pretrain/demica.tar"
 dataset:
   batch_size: 8
   K: 2

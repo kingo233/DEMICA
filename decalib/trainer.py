@@ -114,6 +114,8 @@ class Trainer(object):
         lmk = batch['landmark'].to(self.device); lmk = lmk.view(-1, lmk.shape[-2], lmk.shape[-1])
         masks = batch['mask'].to(self.device); masks = masks.view(-1, images.shape[-2], images.shape[-1]) 
         arcfaces = batch['arcface'].to(self.device); arcfaces = arcfaces.view(-1,arcfaces.shape[-3], arcfaces.shape[-2], arcfaces.shape[-1]) 
+        # arcfaces有特殊要求
+        arcfaces = arcfaces.permute(0,3,1,2)
 
         #-- encoder
         codedict = self.deca.encode(images, arcfaces, use_detail=self.train_detail)
@@ -121,30 +123,30 @@ class Trainer(object):
         ### shape constraints for coarse model
         ### detail consistency for detail model
         # import ipdb; ipdb.set_trace()
-        if self.cfg.loss.shape_consistency or self.cfg.loss.detail_consistency:
-            '''
-            make sure s0, s1 is something to make shape close
-            the difference from ||so - s1|| is 
-            the later encourage s0, s1 is cloase in l2 space, but not really ensure shape will be close
-            '''
-            new_order = np.array([np.random.permutation(self.K) + i*self.K for i in range(self.batch_size)])
-            new_order = new_order.flatten()
-            shapecode = codedict['shape']
-            if self.train_detail:
-                detailcode = codedict['detail']
-                detailcode_new = detailcode[new_order]
-                codedict['detail'] = torch.cat([detailcode, detailcode_new], dim=0)
-                codedict['shape'] = torch.cat([shapecode, shapecode], dim=0)
-            else:
-                shapecode_new = shapecode[new_order]
-                codedict['shape'] = torch.cat([shapecode, shapecode_new], dim=0)
-            for key in ['tex', 'exp', 'pose', 'cam', 'light', 'images']:
-                code = codedict[key]
-                codedict[key] = torch.cat([code, code], dim=0)
+        # if self.cfg.loss.shape_consistency or self.cfg.loss.detail_consistency:
+        #     '''
+        #     make sure s0, s1 is something to make shape close
+        #     the difference from ||so - s1|| is 
+        #     the later encourage s0, s1 is cloase in l2 space, but not really ensure shape will be close
+        #     '''
+        #     new_order = np.array([np.random.permutation(self.K) + i*self.K for i in range(self.batch_size)])
+        #     new_order = new_order.flatten()
+        #     shapecode = codedict['shape']
+        #     if self.train_detail:
+        #         detailcode = codedict['detail']
+        #         detailcode_new = detailcode[new_order]
+        #         codedict['detail'] = torch.cat([detailcode, detailcode_new], dim=0)
+        #         codedict['shape'] = torch.cat([shapecode, shapecode], dim=0)
+        #     else:
+        #         shapecode_new = shapecode[new_order]
+        #         codedict['shape'] = torch.cat([shapecode, shapecode_new], dim=0)
+        #     for key in ['tex', 'exp', 'pose', 'cam', 'light', 'images']:
+        #         code = codedict[key]
+        #         codedict[key] = torch.cat([code, code], dim=0)
             ## append gt
-            images = torch.cat([images, images], dim=0)# images = images.view(-1, images.shape[-3], images.shape[-2], images.shape[-1]) 
-            lmk = torch.cat([lmk, lmk], dim=0) #lmk = lmk.view(-1, lmk.shape[-2], lmk.shape[-1])
-            masks = torch.cat([masks, masks], dim=0)
+            # images = torch.cat([images, images], dim=0)# images = images.view(-1, images.shape[-3], images.shape[-2], images.shape[-1]) 
+            # lmk = torch.cat([lmk, lmk], dim=0) #lmk = lmk.view(-1, lmk.shape[-2], lmk.shape[-1])
+            # masks = torch.cat([masks, masks], dim=0)
 
         batch_size = images.shape[0]
 
@@ -213,11 +215,11 @@ class Trainer(object):
                     pose_params=ground_pose_code)
             # pred_flame_verts shape[batch_size*K,5023,3] ->[batch_size,K,5023*3] ->[K,batch_size,5023*3]
             # ground_flame_verts shape[batch_size,5023,3] ->[batch_size,5023*3]
-            pred_flame_verts = pred_flame_verts.reshape(real_batch_size,pred_flame_verts.shape[0] // real_batch_size, 5023*3)
-            ground_flame_verts = ground_flame_verts.reshape(real_batch_size,5023*3)
-            pred_flame_verts = pred_flame_verts.permute(1,0,2)
+            # pred_flame_verts = pred_flame_verts.reshape(real_batch_size,pred_flame_verts.shape[0] // real_batch_size, 5023*3)
+            # ground_flame_verts = ground_flame_verts.reshape(real_batch_size,5023*3)
+            # pred_flame_verts = pred_flame_verts.permute(1,0,2)
             
-            losses['flame'] = (pred_flame_verts - ground_flame_verts).abs().mean() * 1000.0
+            losses['flame'] = (pred_flame_verts - ground_flame_verts).abs().mean()
 
             if self.cfg.model.jaw_type == 'euler':
                 # import ipdb; ipdb.set_trace()
@@ -459,7 +461,7 @@ class Trainer(object):
                     model_dict['opt'] = self.opt.state_dict()
                     model_dict['global_step'] = self.global_step
                     model_dict['batch_size'] = self.batch_size
-                    torch.save(model_dict, os.path.join(self.cfg.output_dir, 'model' + '.tar'))   
+                    torch.save(model_dict, os.path.join(self.cfg.output_dir, 'demica' + '.tar'))   
                     # 
                     if self.global_step % self.cfg.train.checkpoint_steps*10 == 0:
                         os.makedirs(os.path.join(self.cfg.output_dir, 'models'), exist_ok=True)
