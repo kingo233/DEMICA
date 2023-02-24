@@ -90,14 +90,14 @@ class Trainer(object):
         model_dict = self.deca.model_dict()
         # resume training, including model weight, opt, steps
         # import ipdb; ipdb.set_trace()
-        if self.cfg.train.resume and os.path.exists(os.path.join(self.cfg.output_dir, 'model.tar')):
-            checkpoint = torch.load(os.path.join(self.cfg.output_dir, 'model.tar'))
+        if self.cfg.train.resume and os.path.exists(os.path.join(self.cfg.output_dir, 'demica.tar')):
+            checkpoint = torch.load(os.path.join(self.cfg.output_dir, 'demica.tar'))
             for key in model_dict.keys():
                 if key in checkpoint.keys():
                     util.copy_state_dict(model_dict[key], checkpoint[key])
             util.copy_state_dict(self.opt.state_dict(), checkpoint['opt'])
             self.global_step = checkpoint['global_step']
-            logger.info(f"resume training from {os.path.join(self.cfg.output_dir, 'model.tar')}")
+            logger.info(f"resume training from {os.path.join(self.cfg.output_dir, 'demica.tar')}")
             logger.info(f"training start from step {self.global_step}")
         else:
             logger.info('model path not found, start training from scratch')
@@ -432,6 +432,8 @@ class Trainer(object):
                 
                 if self.global_step % self.cfg.train.log_steps == 0:
                     loss_info = f"ExpName: {self.cfg.exp_name} \nEpoch: {epoch}, Iter: {step}/{iters_every_epoch}, Time: {datetime.now().strftime('%Y-%m-%d-%H:%M:%S')} \n"                 
+                    for k, v in losses.items():
+                        loss_info = loss_info + f'{k}: {v:.4f}, '
                     logger.info(loss_info)
 
                 if self.global_step % self.cfg.train.vis_steps == 0:
