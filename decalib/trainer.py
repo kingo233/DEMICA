@@ -109,13 +109,10 @@ class Trainer(object):
             self.deca.E_flame.eval()
         # [B, K, 3, size, size] ==> [BxK, 3, size, size]
         # images是arcface input
-        real_batch_size = batch['images'].shape[0]
         images = batch['images'].to(self.device); images = images.view(-1, images.shape[-3], images.shape[-2], images.shape[-1]) 
         lmk = batch['landmark'].to(self.device); lmk = lmk.view(-1, lmk.shape[-2], lmk.shape[-1])
         masks = batch['mask'].to(self.device); masks = masks.view(-1, images.shape[-2], images.shape[-1]) 
         arcfaces = batch['arcface'].to(self.device); arcfaces = arcfaces.view(-1,arcfaces.shape[-3], arcfaces.shape[-2], arcfaces.shape[-1]) 
-        # arcfaces有特殊要求
-        arcfaces = arcfaces.permute(0,3,1,2)
 
         #-- encoder
         codedict = self.deca.encode(images, arcfaces, use_detail=self.train_detail)
