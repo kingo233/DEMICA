@@ -74,7 +74,7 @@ cfg.dataset.trans_scale = 0.
 # Options for training
 # ---------------------------------------------------------------------------- #
 cfg.train = CN()
-cfg.train_flame_only = False
+cfg.train.train_flame_only = False
 cfg.train.train_detail = False
 cfg.train.max_epochs = 500
 cfg.train.max_steps = 1000000
