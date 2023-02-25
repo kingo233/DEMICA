@@ -148,7 +148,7 @@ class Trainer(object):
 
         batch_size = images.shape[0]
 
-        if self.cfg.train_flame_only:
+        if self.cfg.train.train_flame_only:
             opdict = self.deca.decode(codedict, rendering = False, vis_lmk=False, return_vis=False, use_detail=False)
             opdict['images'] = images
             opdict['lmk'] = lmk
@@ -162,6 +162,9 @@ class Trainer(object):
             ground_exp_code = ground_exp_code.view(-1,ground_exp_code.shape[-1]).to('cuda:0')
             ground_shape_code = ground_shape_code.view(-1,ground_shape_code.shape[-1]).to('cuda:0')
             ground_pose_code = ground_pose_code.view(-1,ground_pose_code.shape[-1]).to('cuda:0')
+
+            #### ----------------------- Losses
+            losses = {}
 
             with torch.no_grad():
                 ground_flame_verts, landmarks2d_, landmarks3d_ = self.deca.flame(
@@ -219,22 +222,6 @@ class Trainer(object):
             losses['tex_reg'] = (torch.sum(codedict['tex']**2)/2)*self.cfg.loss.reg_tex
             losses['light_reg'] = ((torch.mean(codedict['light'], dim=2)[:,:,None] - codedict['light'])**2).mean()*self.cfg.loss.reg_light
 
-            ground_flame_para = batch['flame']
-            ground_exp_code = ground_flame_para['expression_params']
-            ground_shape_code = ground_flame_para['shape_params']
-            ground_pose_code = ground_flame_para['pose_params']
-
-            ground_exp_code = ground_exp_code.view(-1,ground_exp_code.shape[-1]).to('cuda:0')
-            ground_shape_code = ground_shape_code.view(-1,ground_shape_code.shape[-1]).to('cuda:0')
-            ground_pose_code = ground_pose_code.view(-1,ground_pose_code.shape[-1]).to('cuda:0')
-
-            with torch.no_grad():
-                ground_flame_verts, landmarks2d_, landmarks3d_ = self.deca.flame(
-                    shape_params=ground_shape_code,
-                    expression_params=ground_exp_code,
-                    pose_params=ground_pose_code)
-            
-            losses['flame'] = (pred_flame_verts - ground_flame_verts).abs().mean()
 
             if self.cfg.model.jaw_type == 'euler':
                 # import ipdb; ipdb.set_trace()
