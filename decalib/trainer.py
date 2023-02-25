@@ -148,8 +148,30 @@ class Trainer(object):
 
         batch_size = images.shape[0]
 
+        if self.cfg.train_flame_only:
+            opdict = self.deca.decode(codedict, rendering = False, vis_lmk=False, return_vis=False, use_detail=False)
+            opdict['images'] = images
+            opdict['lmk'] = lmk
+            pred_flame_verts = opdict['verts']
+
+            ground_flame_para = batch['flame']
+            ground_exp_code = ground_flame_para['expression_params']
+            ground_shape_code = ground_flame_para['shape_params']
+            ground_pose_code = ground_flame_para['pose_params']
+
+            ground_exp_code = ground_exp_code.view(-1,ground_exp_code.shape[-1]).to('cuda:0')
+            ground_shape_code = ground_shape_code.view(-1,ground_shape_code.shape[-1]).to('cuda:0')
+            ground_pose_code = ground_pose_code.view(-1,ground_pose_code.shape[-1]).to('cuda:0')
+
+            with torch.no_grad():
+                ground_flame_verts, landmarks2d_, landmarks3d_ = self.deca.flame(
+                    shape_params=ground_shape_code,
+                    expression_params=ground_exp_code,
+                    pose_params=ground_pose_code)
+            
+            losses['flame'] = (pred_flame_verts - ground_flame_verts).abs().mean() * 1000
         ###--------------- training coarse model
-        if not self.train_detail:
+        elif self.train_detail == False:
             #-- decoder
             rendering = True if self.cfg.loss.photo>0 else False
             opdict = self.deca.decode(codedict, rendering = rendering, vis_lmk=False, return_vis=False, use_detail=False)
@@ -211,11 +233,6 @@ class Trainer(object):
                     shape_params=ground_shape_code,
                     expression_params=ground_exp_code,
                     pose_params=ground_pose_code)
-            # pred_flame_verts shape[batch_size*K,5023,3] ->[batch_size,K,5023*3] ->[K,batch_size,5023*3]
-            # ground_flame_verts shape[batch_size,5023,3] ->[batch_size,5023*3]
-            # pred_flame_verts = pred_flame_verts.reshape(real_batch_size,pred_flame_verts.shape[0] // real_batch_size, 5023*3)
-            # ground_flame_verts = ground_flame_verts.reshape(real_batch_size,5023*3)
-            # pred_flame_verts = pred_flame_verts.permute(1,0,2)
             
             losses['flame'] = (pred_flame_verts - ground_flame_verts).abs().mean()
 
@@ -402,7 +419,7 @@ class Trainer(object):
     def fit(self):
         self.prepare_data()
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.opt,
-            mode='min',factor=0.5,verbose=True,threshold=1e-6,patience=5,min_lr=self.cfg.train.min_lr)
+            mode='min',factor=0.5,verbose=True,threshold=1e-6,patience=10,min_lr=self.cfg.train.min_lr)
 
         import math
         # 每个epoch 包含的batch数

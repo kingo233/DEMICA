@@ -23,6 +23,7 @@ loss:
   reg_light: 0.
   shape_consistency: False
 train:
+  train_flame_only: True
   lr: 1e-4
   min_lr: 1e-5
   resume: True
