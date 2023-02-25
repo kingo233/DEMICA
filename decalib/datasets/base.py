@@ -85,8 +85,9 @@ class BaseDataset(Dataset, ABC):
     def __getitem__(self, index):
         actor = self.actors[index]
         images_path, params_path = self.face_dict[actor]
-        # 把actor前缀消除
-        images_path = [path.split('/')[1] for path in images_path]
+        # 根据数据集的不同决定要不要把actor前缀消除
+        if self.name == 'Stirling':
+            images_path = [path.split('/')[1] for path in images_path]
         images_path = [Path(self.dataset_root, self.name, self.image_folder, path) for path in images_path]
 
         # 把images字样换成masks就是mask路径
