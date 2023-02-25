@@ -402,7 +402,7 @@ class Trainer(object):
     def fit(self):
         self.prepare_data()
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.opt,
-            mode='min',factor=0.5,verbose=True,threshold=1e-6,patience=10,min_lr=self.cfg.train.min_lr)
+            mode='min',factor=0.5,verbose=True,threshold=1e-6,patience=4,min_lr=self.cfg.train.min_lr)
 
         import math
         # 每个epoch 包含的batch数
@@ -427,11 +427,6 @@ class Trainer(object):
                     batch = next(self.train_iter)
                 losses, opdict = self.training_step(batch, step)
 
-                # 每个batch的每个部分loss都保存
-                for k,v in losses.items():
-                    if k not in part_loss_dict:
-                        part_loss_dict[k] = []
-                    part_loss_dict[k].append(v)
                 
                 if self.global_step % self.cfg.train.log_steps == 0:
                     loss_info = f"ExpName: {self.cfg.exp_name} \nEpoch: {epoch}, Iter: {step}/{iters_every_epoch}, Time: {datetime.now().strftime('%Y-%m-%d-%H:%M:%S')} \n"                 
@@ -475,30 +470,38 @@ class Trainer(object):
                 train_loss_list.append(all_loss)
                 all_loss.backward() 
                 self.opt.step()
-                self.scheduler.step(all_loss)
                 # self.opt.zero_grad()
+                # 每个batch的每个部分loss都保存
+                for k,v in losses.items():
+                    # if k not in part_loss_dict:
+                    #     part_loss_dict[k] = []
+                    # part_loss_dict[k].append(v)
+                    self.writer.add_scalar(f'loss_{k}',v,self.global_step)
                 for grad_name,params in self.deca.named_parameters():
                     if params.grad is None:
                         continue
-                    if grad_name not in grads_dict:
-                        grads_dict[grad_name] = []
-                        abs_grads_dict[grad_name] = []
-                    grads_dict[grad_name].append(params.grad.mean())
-                    abs_grads_dict[grad_name].append(params.grad.abs().mean())
+                    # if grad_name not in grads_dict:
+                    #     grads_dict[grad_name] = []
+                    #     abs_grads_dict[grad_name] = []
+                    # grads_dict[grad_name].append(params.grad.mean())
+                    # abs_grads_dict[grad_name].append(params.grad.abs().mean())
+                    self.writer.add_scalar(f'grad_{grad_name}',params.grad.mean())
+                    self.writer.add_scalar(f'abs_grad_{grad_name}',params.grad.abs().mean())
 
                 self.global_step += 1
                 if self.global_step > self.cfg.train.max_steps:
                     break
             
             train_loss = torch.tensor(train_loss_list,requires_grad=False).mean()
+            self.scheduler.step(train_loss)
             logger.info(f"{self.cfg.exp_name} : Epoch: {epoch}, Time: {datetime.now().strftime('%Y-%m-%d-%H:%M:%S')},train_loss = {train_loss.item():.4f}\n")
 
             self.validation_step()
 
             # tensorboard
-            self.writer.add_scalar('train_loss', train_loss, epoch)
-            for grad_name in grads_dict:
-                self.writer.add_scalar(f'grad_{grad_name}',torch.tensor(grads_dict[grad_name],requires_grad=False).mean(), epoch)
-                self.writer.add_scalar(f'abs_grad_{grad_name}', torch.tensor(abs_grads_dict[grad_name],requires_grad=False).mean(), epoch)
-            for loss_name in part_loss_dict:
-                self.writer.add_scalar(f'loss_{loss_name}', torch.tensor(part_loss_dict[loss_name],requires_grad=False).mean(), epoch)
+            # self.writer.add_scalar('train_loss', train_loss, epoch)
+            # for grad_name in grads_dict:
+            #     self.writer.add_scalar(f'grad_{grad_name}',torch.tensor(grads_dict[grad_name],requires_grad=False).mean(), epoch)
+            #     self.writer.add_scalar(f'abs_grad_{grad_name}', torch.tensor(abs_grads_dict[grad_name],requires_grad=False).mean(), epoch)
+            # for loss_name in part_loss_dict:
+            #     self.writer.add_scalar(f'loss_{loss_name}', torch.tensor(part_loss_dict[loss_name],requires_grad=False).mean(), epoch)
