@@ -480,13 +480,11 @@ class Trainer(object):
                 for grad_name,params in self.deca.named_parameters():
                     if params.grad is None:
                         continue
-                    # if grad_name not in grads_dict:
-                    #     grads_dict[grad_name] = []
-                    #     abs_grads_dict[grad_name] = []
-                    # grads_dict[grad_name].append(params.grad.mean())
-                    # abs_grads_dict[grad_name].append(params.grad.abs().mean())
-                    self.writer.add_scalar(f'grad_{grad_name}',params.grad.mean())
-                    self.writer.add_scalar(f'abs_grad_{grad_name}',params.grad.abs().mean())
+                    if grad_name not in grads_dict:
+                        grads_dict[grad_name] = []
+                        abs_grads_dict[grad_name] = []
+                    grads_dict[grad_name].append(params.grad.mean())
+                    abs_grads_dict[grad_name].append(params.grad.abs().mean())
 
                 self.global_step += 1
                 if self.global_step > self.cfg.train.max_steps:
@@ -500,8 +498,8 @@ class Trainer(object):
 
             # tensorboard
             # self.writer.add_scalar('train_loss', train_loss, epoch)
-            # for grad_name in grads_dict:
-            #     self.writer.add_scalar(f'grad_{grad_name}',torch.tensor(grads_dict[grad_name],requires_grad=False).mean(), epoch)
-            #     self.writer.add_scalar(f'abs_grad_{grad_name}', torch.tensor(abs_grads_dict[grad_name],requires_grad=False).mean(), epoch)
+            for grad_name in grads_dict:
+                self.writer.add_scalar(f'grad_{grad_name}',torch.tensor(grads_dict[grad_name],requires_grad=False).mean(), epoch)
+                self.writer.add_scalar(f'abs_grad_{grad_name}', torch.tensor(abs_grads_dict[grad_name],requires_grad=False).mean(), epoch)
             # for loss_name in part_loss_dict:
             #     self.writer.add_scalar(f'loss_{loss_name}', torch.tensor(part_loss_dict[loss_name],requires_grad=False).mean(), epoch)

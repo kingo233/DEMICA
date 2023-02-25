@@ -168,7 +168,7 @@ class Arcface(IResNet):
         if pretrained_path is not None and os.path.exists(pretrained_path):
             logger.info(f'[Arcface] Initializing from insightface model from {pretrained_path}.')
             self.load_state_dict(torch.load(pretrained_path))
-        self.freezer([self.layer1, self.layer2, self.layer3, self.conv1, self.bn1, self.prelu])
+        # self.freezer([self.layer1, self.layer2, self.layer3, self.conv1, self.bn1, self.prelu])
 
     def freezer(self, layers):
         for layer in layers:
@@ -182,13 +182,13 @@ class Arcface(IResNet):
     def forward_arcface(self, x):
         with torch.cuda.amp.autocast(self.fp16):
             ### FROZEN ###
-            with torch.no_grad():
-                x = self.conv1(x)
-                x = self.bn1(x)
-                x = self.prelu(x)
-                x = self.layer1(x)
-                x = self.layer2(x)
-                x = self.layer3(x)
+            # with torch.no_grad():
+            x = self.conv1(x)
+            x = self.bn1(x)
+            x = self.prelu(x)
+            x = self.layer1(x)
+            x = self.layer2(x)
+            x = self.layer3(x)
 
             x = self.layer4(x)
             x = self.bn2(x)
