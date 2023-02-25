@@ -15,6 +15,7 @@
 
 import os, sys
 import torch
+import torch.optim
 import torchvision
 import torch.nn.functional as F
 import torch.nn as nn
@@ -400,6 +401,8 @@ class Trainer(object):
 
     def fit(self):
         self.prepare_data()
+        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.opt,
+            mode='min',factor=0.5,verbose=True,threshold=1e-6,patience=10,min_lr=self.cfg.train.min_lr)
 
         import math
         # 每个epoch 包含的batch数
@@ -472,6 +475,7 @@ class Trainer(object):
                 train_loss_list.append(all_loss)
                 all_loss.backward() 
                 self.opt.step()
+                self.scheduler(all_loss)
                 # self.opt.zero_grad()
                 for grad_name,params in self.deca.named_parameters():
                     if params.grad is None:
