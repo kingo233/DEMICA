@@ -475,7 +475,7 @@ class Trainer(object):
                 train_loss_list.append(all_loss)
                 all_loss.backward() 
                 self.opt.step()
-                self.scheduler(all_loss)
+                self.scheduler.step(all_loss)
                 # self.opt.zero_grad()
                 for grad_name,params in self.deca.named_parameters():
                     if params.grad is None:
