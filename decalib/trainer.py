@@ -402,7 +402,7 @@ class Trainer(object):
     def fit(self):
         self.prepare_data()
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.opt,
-            mode='min',factor=0.5,verbose=True,threshold=1e-6,patience=4,min_lr=self.cfg.train.min_lr)
+            mode='min',factor=0.5,verbose=True,threshold=1e-6,patience=5,min_lr=self.cfg.train.min_lr)
 
         import math
         # 每个epoch 包含的batch数
@@ -470,6 +470,7 @@ class Trainer(object):
                 train_loss_list.append(all_loss)
                 all_loss.backward() 
                 self.opt.step()
+                self.scheduler.step(all_loss)
                 # self.opt.zero_grad()
                 # 每个batch的每个部分loss都保存
                 for k,v in losses.items():
@@ -491,7 +492,6 @@ class Trainer(object):
                     break
             
             train_loss = torch.tensor(train_loss_list,requires_grad=False).mean()
-            self.scheduler.step(train_loss)
             logger.info(f"{self.cfg.exp_name} : Epoch: {epoch}, Time: {datetime.now().strftime('%Y-%m-%d-%H:%M:%S')},train_loss = {train_loss.item():.4f}\n")
 
             self.validation_step()
