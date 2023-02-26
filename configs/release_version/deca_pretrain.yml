@@ -24,8 +24,8 @@ loss:
   shape_consistency: False
 train:
   train_flame_only: False
-  lr: 1e-4
-  min_lr: 1e-6
+  lr: 4e-6
+  min_lr: 2e-6
   resume: True
   max_epochs: 1000
   max_steps: 100000

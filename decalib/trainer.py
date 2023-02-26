@@ -222,6 +222,22 @@ class Trainer(object):
             losses['tex_reg'] = (torch.sum(codedict['tex']**2)/2)*self.cfg.loss.reg_tex
             losses['light_reg'] = ((torch.mean(codedict['light'], dim=2)[:,:,None] - codedict['light'])**2).mean()*self.cfg.loss.reg_light
 
+            ground_flame_para = batch['flame']
+            ground_exp_code = ground_flame_para['expression_params']
+            ground_shape_code = ground_flame_para['shape_params']
+            ground_pose_code = ground_flame_para['pose_params']
+
+            ground_exp_code = ground_exp_code.view(-1,ground_exp_code.shape[-1]).to('cuda:0')
+            ground_shape_code = ground_shape_code.view(-1,ground_shape_code.shape[-1]).to('cuda:0')
+            ground_pose_code = ground_pose_code.view(-1,ground_pose_code.shape[-1]).to('cuda:0')
+
+            with torch.no_grad():
+                ground_flame_verts, landmarks2d_, landmarks3d_ = self.deca.flame(
+                    shape_params=ground_shape_code,
+                    expression_params=ground_exp_code,
+                    pose_params=ground_pose_code)
+            
+            losses['flame'] = (pred_flame_verts - ground_flame_verts).abs().mean()
 
             if self.cfg.model.jaw_type == 'euler':
                 # import ipdb; ipdb.set_trace()
@@ -478,9 +494,9 @@ class Trainer(object):
                 # self.opt.zero_grad()
                 # 每个batch的每个部分loss都保存
                 for k,v in losses.items():
-                    # if k not in part_loss_dict:
-                    #     part_loss_dict[k] = []
-                    # part_loss_dict[k].append(v)
+                    if k not in part_loss_dict:
+                        part_loss_dict[k] = []
+                    part_loss_dict[k].append(v)
                     self.writer.add_scalar(f'loss_{k}',v,self.global_step)
                 for grad_name,params in self.deca.named_parameters():
                     if params.grad is None:
@@ -501,9 +517,9 @@ class Trainer(object):
             self.validation_step()
 
             # tensorboard
-            # self.writer.add_scalar('train_loss', train_loss, epoch)
+            self.writer.add_scalar('epoch_train_loss', train_loss, epoch)
             for grad_name in grads_dict:
                 self.writer.add_scalar(f'grad_{grad_name}',torch.tensor(grads_dict[grad_name],requires_grad=False).mean(), epoch)
                 self.writer.add_scalar(f'abs_grad_{grad_name}', torch.tensor(abs_grads_dict[grad_name],requires_grad=False).mean(), epoch)
-            # for loss_name in part_loss_dict:
-            #     self.writer.add_scalar(f'loss_{loss_name}', torch.tensor(part_loss_dict[loss_name],requires_grad=False).mean(), epoch)
+            for loss_name in part_loss_dict:
+                self.writer.add_scalar(f'epoch_loss_{loss_name}', torch.tensor(part_loss_dict[loss_name],requires_grad=False).mean(), epoch)
