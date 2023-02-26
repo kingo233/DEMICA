@@ -143,7 +143,6 @@ class Trainer(object):
             # append gt
             images = torch.cat([images, images], dim=0)# images = images.view(-1, images.shape[-3], images.shape[-2], images.shape[-1]) 
             lmk = torch.cat([lmk, lmk], dim=0) #lmk = lmk.view(-1, lmk.shape[-2], lmk.shape[-1])
-            masks = torch.cat([masks, masks], dim=0)
 
         batch_size = images.shape[0]
 

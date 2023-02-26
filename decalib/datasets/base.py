@@ -58,6 +58,7 @@ class BaseDataset(Dataset, ABC):
             prefix_path = os.path.join(self.dataset_root,self.name,self.image_folder,actor)
             actor_img_list = os.listdir(prefix_path)
             actor_img_list = [os.path.join(actor,img_path) for img_path in actor_img_list]
+            self.face_dict[actor] = actor_img_list
 
         logger.info(f'[Dataset {self.name}] Total {len(self.actors)} actors loaded!')
         self.set_smallest_k()
