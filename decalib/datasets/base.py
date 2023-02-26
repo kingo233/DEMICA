@@ -47,17 +47,18 @@ class BaseDataset(Dataset, ABC):
         self.dataset_root = 'dataset'
         self.total_images = 0
         self.image_folder = 'images'
-        self.flame_folder = 'FLAME_parameters'
-        self.mask_folder = 'masks'
         self.initialize()
 
     def initialize(self):
         logger.info(f'[{self.name}] Initialization')
         # 只要是数据集都会有npy文件
-        image_list_file = f'dataset/image_paths/{str.upper(self.name)}.npy'
-        logger.info(f'[{self.name}] Load cached file list: ' + image_list_file)
-        self.face_dict = np.load(image_list_file, allow_pickle=True).item()
-        self.actors = list(self.face_dict.keys())
+        self.actors = os.listdir(os.path.join(self.dataset_root,self.name,self.image_folder))
+        self.face_dict = {}
+        for actor in self.actors:
+            prefix_path = os.path.join(self.dataset_root,self.name,self.image_folder,actor)
+            actor_img_list = os.listdir(prefix_path)
+            actor_img_list = [os.path.join(actor,img_path) for img_path in actor_img_list]
+
         logger.info(f'[Dataset {self.name}] Total {len(self.actors)} actors loaded!')
         self.set_smallest_k()
         # 为把原始图片裁剪成224*224做准备
@@ -69,13 +70,13 @@ class BaseDataset(Dataset, ABC):
         self.min_max_K = np.Inf
         max_min_k = -np.Inf
         for key in self.face_dict.keys():
-            length = len(self.face_dict[key][0])
+            length = len(self.face_dict[key])
             if length < self.min_max_K:
                 self.min_max_K = length
             if length > max_min_k:
                 max_min_k = length
 
-        self.total_images = reduce(lambda k, l: l + k, map(lambda e: len(self.face_dict[e][0]), self.actors))
+        self.total_images = reduce(lambda k, l: l + k, map(lambda e: len(self.face_dict[e]), self.actors))
         loguru.logger.info(f'Dataset {self.name} with min K = {self.min_max_K} max K = {max_min_k} length = {len(self.face_dict)} total images = {self.total_images}')
         return self.min_max_K
 
@@ -84,14 +85,12 @@ class BaseDataset(Dataset, ABC):
 
     def __getitem__(self, index):
         actor = self.actors[index]
-        images_path, params_path = self.face_dict[actor]
+        images_path = self.face_dict[actor]
         # 根据数据集的不同决定要不要把actor前缀消除
         if self.name == 'Stirling':
             images_path = [path.split('/')[1] for path in images_path]
         images_path = [Path(self.dataset_root, self.name, self.image_folder, path) for path in images_path]
 
-        # 把images字样换成masks就是mask路径
-        masks_path = [str(path).replace('images','masks') for path in images_path]
 
         sample_list = np.array(np.random.choice(range(len(images_path)), size=self.K, replace=False))
 
@@ -100,24 +99,12 @@ class BaseDataset(Dataset, ABC):
             K = max(0, min(200, self.min_max_K))
             sample_list = np.array(range(len(images_path))[:K])
 
-        params = np.load(os.path.join(self.dataset_root, self.name, self.flame_folder, params_path), allow_pickle=True)
-        pose = torch.tensor(params['pose']).float()
-        betas = torch.tensor(params['betas']).float()
-
-        flame = {
-            'shape_params': torch.cat(K * [betas[:300][None]], dim=0),
-            'expression_params': torch.cat(K * [betas[300:][None]], dim=0),
-            'pose_params': torch.cat(K * [torch.cat([pose[:3], pose[6:9]])[None]], dim=0),
-        }
-
         arcface_list = []
         landmark_list = []
-        mask_list = []
         image_list = []
 
         for i in sample_list:
             image_path = images_path[i]
-            mask_path = masks_path[i]
             # w * h * 3
             img = cv2.imread(str(image_path))
             img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
@@ -154,14 +141,9 @@ class BaseDataset(Dataset, ABC):
 
             landmark_list.append(landmark[0])
 
-            # 获得mask
-            mask = cv2.imread(mask_path)
-            mask = cv2.resize(mask,(224,224))
-            mask_list.append(np.array(mask))
 
         arcfaces_array = torch.from_numpy(np.array(arcface_list)).float()
         landmarks = torch.from_numpy(np.array(landmark_list)).float()
-        masks = torch.from_numpy(np.array(mask_list)).float()
         images = torch.from_numpy(np.array(image_list)).float()
 
         return {
@@ -170,9 +152,7 @@ class BaseDataset(Dataset, ABC):
             'arcface': arcfaces_array,
             'imagename': actor,
             'dataset': self.name,
-            'flame': flame,
             'landmark':landmarks,
-            'mask':masks
         }
 
 

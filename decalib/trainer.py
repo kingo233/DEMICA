@@ -112,7 +112,6 @@ class Trainer(object):
         # images是arcface input
         images = batch['images'].to(self.device); images = images.view(-1, images.shape[-3], images.shape[-2], images.shape[-1]) 
         lmk = batch['landmark'].to(self.device); lmk = lmk.view(-1, lmk.shape[-2], lmk.shape[-1])
-        masks = batch['mask'].to(self.device); masks = masks.view(-1, images.shape[-2], images.shape[-1]) 
         arcfaces = batch['arcface'].to(self.device); arcfaces = arcfaces.view(-1,arcfaces.shape[-3], arcfaces.shape[-2], arcfaces.shape[-1]) 
 
         #-- encoder
@@ -121,60 +120,35 @@ class Trainer(object):
         ### shape constraints for coarse model
         ### detail consistency for detail model
         # import ipdb; ipdb.set_trace()
-        # if self.cfg.loss.shape_consistency or self.cfg.loss.detail_consistency:
-        #     '''
-        #     make sure s0, s1 is something to make shape close
-        #     the difference from ||so - s1|| is 
-        #     the later encourage s0, s1 is cloase in l2 space, but not really ensure shape will be close
-        #     '''
-        #     new_order = np.array([np.random.permutation(self.K) + i*self.K for i in range(self.batch_size)])
-        #     new_order = new_order.flatten()
-        #     shapecode = codedict['shape']
-        #     if self.train_detail:
-        #         detailcode = codedict['detail']
-        #         detailcode_new = detailcode[new_order]
-        #         codedict['detail'] = torch.cat([detailcode, detailcode_new], dim=0)
-        #         codedict['shape'] = torch.cat([shapecode, shapecode], dim=0)
-        #     else:
-        #         shapecode_new = shapecode[new_order]
-        #         codedict['shape'] = torch.cat([shapecode, shapecode_new], dim=0)
-        #     for key in ['tex', 'exp', 'pose', 'cam', 'light', 'images']:
-        #         code = codedict[key]
-        #         codedict[key] = torch.cat([code, code], dim=0)
-            ## append gt
-            # images = torch.cat([images, images], dim=0)# images = images.view(-1, images.shape[-3], images.shape[-2], images.shape[-1]) 
-            # lmk = torch.cat([lmk, lmk], dim=0) #lmk = lmk.view(-1, lmk.shape[-2], lmk.shape[-1])
-            # masks = torch.cat([masks, masks], dim=0)
+        if self.cfg.loss.shape_consistency or self.cfg.loss.detail_consistency:
+            '''
+            make sure s0, s1 is something to make shape close
+            the difference from ||so - s1|| is 
+            the later encourage s0, s1 is cloase in l2 space, but not really ensure shape will be close
+            '''
+            new_order = np.array([np.random.permutation(self.K) + i*self.K for i in range(self.batch_size)])
+            new_order = new_order.flatten()
+            shapecode = codedict['shape']
+            if self.train_detail:
+                detailcode = codedict['detail']
+                detailcode_new = detailcode[new_order]
+                codedict['detail'] = torch.cat([detailcode, detailcode_new], dim=0)
+                codedict['shape'] = torch.cat([shapecode, shapecode], dim=0)
+            else:
+                shapecode_new = shapecode[new_order]
+                codedict['shape'] = torch.cat([shapecode, shapecode_new], dim=0)
+            for key in ['tex', 'exp', 'pose', 'cam', 'light', 'images']:
+                code = codedict[key]
+                codedict[key] = torch.cat([code, code], dim=0)
+            # append gt
+            images = torch.cat([images, images], dim=0)# images = images.view(-1, images.shape[-3], images.shape[-2], images.shape[-1]) 
+            lmk = torch.cat([lmk, lmk], dim=0) #lmk = lmk.view(-1, lmk.shape[-2], lmk.shape[-1])
+            masks = torch.cat([masks, masks], dim=0)
 
         batch_size = images.shape[0]
 
-        if self.cfg.train.train_flame_only:
-            opdict = self.deca.decode(codedict, rendering = False, vis_lmk=False, return_vis=False, use_detail=False)
-            opdict['images'] = images
-            opdict['lmk'] = lmk
-            pred_flame_verts = opdict['verts']
-
-            ground_flame_para = batch['flame']
-            ground_exp_code = ground_flame_para['expression_params']
-            ground_shape_code = ground_flame_para['shape_params']
-            ground_pose_code = ground_flame_para['pose_params']
-
-            ground_exp_code = ground_exp_code.view(-1,ground_exp_code.shape[-1]).to('cuda:0')
-            ground_shape_code = ground_shape_code.view(-1,ground_shape_code.shape[-1]).to('cuda:0')
-            ground_pose_code = ground_pose_code.view(-1,ground_pose_code.shape[-1]).to('cuda:0')
-
-            #### ----------------------- Losses
-            losses = {}
-
-            with torch.no_grad():
-                ground_flame_verts, landmarks2d_, landmarks3d_ = self.deca.flame(
-                    shape_params=ground_shape_code,
-                    expression_params=ground_exp_code,
-                    pose_params=ground_pose_code)
-            
-            losses['flame'] = (pred_flame_verts - ground_flame_verts).abs().mean() * 1000
         ###--------------- training coarse model
-        elif self.train_detail == False:
+        if self.train_detail == False:
             #-- decoder
             rendering = True if self.cfg.loss.photo>0 else False
             opdict = self.deca.decode(codedict, rendering = rendering, vis_lmk=False, return_vis=False, use_detail=False)
@@ -222,22 +196,6 @@ class Trainer(object):
             losses['tex_reg'] = (torch.sum(codedict['tex']**2)/2)*self.cfg.loss.reg_tex
             losses['light_reg'] = ((torch.mean(codedict['light'], dim=2)[:,:,None] - codedict['light'])**2).mean()*self.cfg.loss.reg_light
 
-            ground_flame_para = batch['flame']
-            ground_exp_code = ground_flame_para['expression_params']
-            ground_shape_code = ground_flame_para['shape_params']
-            ground_pose_code = ground_flame_para['pose_params']
-
-            ground_exp_code = ground_exp_code.view(-1,ground_exp_code.shape[-1]).to('cuda:0')
-            ground_shape_code = ground_shape_code.view(-1,ground_shape_code.shape[-1]).to('cuda:0')
-            ground_pose_code = ground_pose_code.view(-1,ground_pose_code.shape[-1]).to('cuda:0')
-
-            with torch.no_grad():
-                ground_flame_verts, landmarks2d_, landmarks3d_ = self.deca.flame(
-                    shape_params=ground_shape_code,
-                    expression_params=ground_exp_code,
-                    pose_params=ground_pose_code)
-            
-            losses['flame'] = (pred_flame_verts - ground_flame_verts).abs().mean()
 
             if self.cfg.model.jaw_type == 'euler':
                 # import ipdb; ipdb.set_trace()
