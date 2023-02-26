@@ -76,8 +76,6 @@ class BaseDataset(Dataset, ABC):
             if length > max_min_k:
                 max_min_k = length
 
-        self.total_images = reduce(lambda k, l: l + k, map(lambda e: len(self.face_dict[e]), self.actors))
-        loguru.logger.info(f'Dataset {self.name} with min K = {self.min_max_K} max K = {max_min_k} length = {len(self.face_dict)} total images = {self.total_images}')
         return self.min_max_K
 
     def __len__(self):
