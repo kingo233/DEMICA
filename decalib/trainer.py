@@ -461,6 +461,8 @@ class Trainer(object):
                     if grad_name not in grads_dict:
                         grads_dict[grad_name] = []
                         abs_grads_dict[grad_name] = []
+                    self.writer.add_scalar(f'grad_{grad_name}',params.grad.mean(), self.global_step)
+                    self.writer.add_scalar(f'abs_grad_{grad_name}', params.grad.abs().mean(), self.global_step)
                     grads_dict[grad_name].append(params.grad.mean())
                     abs_grads_dict[grad_name].append(params.grad.abs().mean())
 
@@ -476,7 +478,7 @@ class Trainer(object):
             # tensorboard
             self.writer.add_scalar('epoch_train_loss', train_loss, epoch)
             for grad_name in grads_dict:
-                self.writer.add_scalar(f'grad_{grad_name}',torch.tensor(grads_dict[grad_name],requires_grad=False).mean(), epoch)
-                self.writer.add_scalar(f'abs_grad_{grad_name}', torch.tensor(abs_grads_dict[grad_name],requires_grad=False).mean(), epoch)
+                self.writer.add_scalar(f'epoch_grad_{grad_name}',torch.tensor(grads_dict[grad_name],requires_grad=False).mean(), epoch)
+                self.writer.add_scalar(f'epoch_abs_grad_{grad_name}', torch.tensor(abs_grads_dict[grad_name],requires_grad=False).mean(), epoch)
             for loss_name in part_loss_dict:
                 self.writer.add_scalar(f'epoch_loss_{loss_name}', torch.tensor(part_loss_dict[loss_name],requires_grad=False).mean(), epoch)

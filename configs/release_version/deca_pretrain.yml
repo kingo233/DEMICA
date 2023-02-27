@@ -13,7 +13,7 @@
 output_dir: "logs/pretrain"
 pretrained_modelpath: ''
 dataset:
-  batch_size: 80
+  batch_size: 64
   K: 1
 loss:
   photo: 0.
@@ -24,8 +24,8 @@ loss:
   shape_consistency: False
 train:
   train_flame_only: False
-  lr: 8e-5
-  min_lr: 1e-6
+  lr: 7e-9
+  min_lr: 3e-9
   resume: True
   max_epochs: 1000
   max_steps: 100000
