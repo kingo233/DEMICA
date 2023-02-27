@@ -465,7 +465,7 @@ class Trainer(object):
                     self.writer.add_scalar(f'abs_grad_{grad_name}', params.grad.abs().mean(), self.global_step)
                     grads_dict[grad_name].append(params.grad.mean())
                     abs_grads_dict[grad_name].append(params.grad.abs().mean())
-                self.writer.add_scalar(f'lr',self.opt.param_groups[0]["lr",self.global_step])
+                self.writer.add_scalar(f'lr',self.opt.param_groups[0]["lr"],self.global_step)
 
                 self.global_step += 1
                 if self.global_step > self.cfg.train.max_steps:
