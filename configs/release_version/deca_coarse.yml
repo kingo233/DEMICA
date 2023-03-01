@@ -13,13 +13,13 @@ dataset:
   K: 2
 
 loss:
-  lmk: 1e-5
-  eyed: 1e-5
-  lipd: 5e-6
+  # lmk: 1e-5
+  # eyed: 1e-5
+  # lipd: 5e-6
 
 train:
-  lr: 1e-4
-  min_lr: 5e-6
+  lr: 7e-9
+  min_lr: 6e-9
   resume: True
   max_epochs: 1000
   max_steps: 200000

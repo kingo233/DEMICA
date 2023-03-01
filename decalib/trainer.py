@@ -237,7 +237,9 @@ class Trainer(object):
                     expression_params=ground_exp_code,
                     pose_params=ground_pose_code)
             
-            losses['flame'] = (pred_flame_verts - ground_flame_verts).abs().mean()
+            losses['flame'] = (pred_flame_verts - ground_flame_verts).abs().mean() * 1e4
+            with torch.no_grad():
+                losses['flame'] = losses['flame'] / 1e4
 
             if self.cfg.model.jaw_type == 'euler':
                 # import ipdb; ipdb.set_trace()
