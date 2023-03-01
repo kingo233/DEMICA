@@ -35,7 +35,7 @@ def main(cfg):
     trainer = Trainer(model=deca, config=cfg)
 
     ## start train
-    trainer.fit()
+    trainer.evaluate()
 
 if __name__ == '__main__':
     from decalib.utils.config import parse_args

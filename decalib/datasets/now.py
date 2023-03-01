@@ -8,10 +8,14 @@ from skimage.io import imread, imsave
 from skimage.transform import estimate_transform, warp, resize, rescale
 from glob import glob
 from torch.utils.data import Dataset, DataLoader, ConcatDataset
+from insightface.app import FaceAnalysis
+from insightface.app.common import Face
+from insightface.utils import face_align
+from .detectors import FAN
 
-class NoWDataset(Dataset):
+class NoWDatasetBackup(Dataset):
     def __init__(self, ring_elements=6, crop_size=224, scale=1.6):
-        folder = '/ps/scratch/yfeng/other-github/now_evaluation/data/NoW_Dataset'
+        folder = 'dataset/NoW_Dataset'
         self.data_path = os.path.join(folder, 'imagepathsvalidation.txt')
         with open(self.data_path) as f:
             self.data_lines = f.readlines()
@@ -51,9 +55,76 @@ class NoWDataset(Dataset):
         
         image = image/255.
         dst_image = warp(image, tform.inverse, output_shape=(self.crop_size, self.crop_size))
+        arcface = cv2.resize(dst_image,(112,112))
+        arcface = arcface.transpose(2,0,1)
         dst_image = dst_image.transpose(2,0,1)
         return {'image': torch.tensor(dst_image).float(),
                 'imagename': self.data_lines[index].strip().replace('.jpg', ''),
+                'arcface': torch.tensor(arcface).float()
                 # 'tform': tform,
                 # 'original_image': torch.tensor(image.transpose(2,0,1)).float(),
                 }
+
+class NoWDataset(Dataset):
+    def __init__(self, ring_elements=6, crop_size=224, scale=1.6):
+        folder = 'dataset/NoW_Dataset'
+        self.data_path = os.path.join(folder, 'imagepathsvalidation.txt')
+        with open(self.data_path) as f:
+            self.data_lines = f.readlines()
+
+        self.imagefolder = os.path.join(folder, 'final_release_version', 'iphone_pictures')
+        # 为把原始图片裁剪成224*224做准备
+        self.app = FaceAnalysis(name='antelopev2', providers=['CPUExecutionProvider'])
+        self.app.prepare(ctx_id=0, det_size=(224, 224))
+        self.fan = FAN()
+
+    def __len__(self):
+        return len(self.data_lines)
+    
+    def __getitem__(self, index):
+        imagepath = os.path.join(self.imagefolder, self.data_lines[index].strip()) #+ '.jpg'
+
+        img = imread(imagepath)[:,:,:3]
+        # 以下部分是在跑一个人脸检测模型，得到置信分数最高的边界框，然后裁剪
+        bboxes, kpss = self.app.det_model.detect(img, max_num=0, metric='default')
+        i = get_center(bboxes, img)
+        bbox = bboxes[i, 0:4]
+        det_score = bboxes[i, 4]
+        kps = None
+        if kpss is not None:
+            kps = kpss[i]
+
+        face = Face(bbox=bbox, kps=kps, det_score=det_score)
+        # 获得裁剪的112*112输出，arcface用于粗糙模型，对应arcface
+        arcface = face_align.norm_crop(img, landmark=face.kps, image_size=224)
+        arcface = arcface / 255.0
+        detail_input = arcface
+        arcface = cv2.resize(arcface,(112,112))
+        arcface = np.transpose(arcface,(2,0,1))
+        # 224 * 224对应images，是detail encoder输入
+        detail_input = np.transpose(detail_input,(2,0,1))
+
+        return {'image': torch.tensor(detail_input).float(),
+                'imagename': self.data_lines[index].strip().replace('.jpg', ''),
+                'arcface': torch.tensor(arcface).float()
+                }
+
+def get_center(bboxes, img):
+    img_center = img.shape[0] // 2, img.shape[1] // 2
+    size = bboxes.shape[0]
+    distance = np.Inf
+    j = 0
+    for i in range(size):
+        x1, y1, x2, y2 = bboxes[i, 0:4]
+        dx = abs(x2 - x1) / 2.0
+        dy = abs(y2 - y1) / 2.0
+        current = dist((x1 + dx, y1 + dy), img_center)
+        if current < distance:
+            distance = current
+            j = i
+
+    return j
+
+import math
+def dist(p1, p2):
+    return math.sqrt(((p1[0] - p2[0]) ** 2) + ((p1[1] - p2[1]) ** 2))
