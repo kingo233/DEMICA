@@ -156,8 +156,11 @@ class BaseDataset(Dataset, ABC):
 
             # 获得mask
             mask = cv2.imread(mask_path)
-            mask = cv2.resize(mask,(224,224))
-            mask_list.append(np.array(mask))
+            single_mask = np.zeros((mask.shape[0],mask.shape[1],1),dtype=np.uint8)
+            cv2.cvtColor(mask,cv2.COLOR_RGB2GRAY,single_mask)
+            single_mask = cv2.resize(single_mask,(224,224))
+            single_mask[single_mask > 0] = 1
+            mask_list.append(np.array(single_mask))
 
         arcfaces_array = torch.from_numpy(np.array(arcface_list)).float()
         landmarks = torch.from_numpy(np.array(landmark_list)).float()
