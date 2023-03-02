@@ -187,13 +187,72 @@ class FLAME(nn.Module):
         landmarks = torch.einsum('blfi,blf->bli', [lmk_vertices, lmk_bary_coords])
         return landmarks
 
-    def seletec_3d68(self, vertices):
+    # def seletec_3d68(self, vertices):
+    def compute_landmarks(self, vertices):
         landmarks3d = vertices2landmarks(vertices, self.faces_tensor,
-                                       self.full_lmk_faces_idx.repeat(vertices.shape[0], 1),
-                                       self.full_lmk_bary_coords.repeat(vertices.shape[0], 1, 1))
+                                         self.full_lmk_faces_idx.repeat(vertices.shape[0], 1),
+                                         self.full_lmk_bary_coords.repeat(vertices.shape[0], 1, 1))
         return landmarks3d
 
-    def forward(self, shape_params=None, expression_params=None, pose_params=None, eye_pose_params=None):
+    def seletec_3d68(self, vertices):
+        landmarks3d = vertices2landmarks(vertices, self.faces_tensor,
+                                         self.full_lmk_faces_idx.repeat(vertices.shape[0], 1),
+                                         self.full_lmk_bary_coords.repeat(vertices.shape[0], 1, 1))
+        return landmarks3d
+
+    def project_to_shape_basis(self, shape_vector, shape_as_offset=False):
+        batch_size = shape_vector.shape[0]
+        n_vertices = self.v_template.shape[0]
+        n_eigenvectors = self.n_shape
+        # shape_params = basis dot (shape_vector - average)  # uses properties of the PCA
+        if shape_as_offset:
+            diff = shape_vector
+        else:
+            diff = shape_vector - self.v_template
+        return torch.matmul(diff.reshape(batch_size, -1), self.shapedirs[:, :, :n_eigenvectors].reshape(3 * n_vertices, n_eigenvectors))
+
+    def compute_distance_to_basis(self, shape_vector, shape_as_offset=False):
+        batch_size = shape_vector.shape[0]
+        n_vertices = self.v_template.shape[0]
+        n_eigenvectors = self.n_shape
+
+        # shape_vector torch.Size([3, 5023, 3])
+        # self.v_template torch.Size([5023, 3])
+        # self.shapedirs torch.Size([5023, 3, 150])
+        # diff torch.Size([3, 5023, 3])
+        # shape_params torch.Size([5023, 15069])
+
+        # shape_params = basis dot (shape_vector - average)  # uses properties of the PCA
+        if shape_as_offset:
+            diff = shape_vector
+        else:
+            diff = shape_vector - self.v_template
+        shape_params = torch.matmul(diff.reshape(batch_size, -1), self.shapedirs[:, :, :n_eigenvectors].reshape(3 * n_vertices, n_eigenvectors))
+        distance = diff - torch.matmul(shape_params, self.shapedirs[:, :, :n_eigenvectors].reshape(n_vertices * 3, n_eigenvectors).t()).reshape(batch_size, n_vertices, 3)
+        return distance
+
+    def get_std(self):
+        n_eigenvectors = self.cfg.n_shape
+        basis = self.shapedirs[:, :, :n_eigenvectors]
+        std = torch.norm(basis.reshape(-1, n_eigenvectors), dim=0)
+
+        return std
+
+    def compute_closest_shape(self, shape_vector):
+        B = shape_vector.shape[0]
+        N = self.v_template.shape[0]
+        n_eigenvectors = self.cfg.n_shape
+
+        basis = self.shapedirs[:, :, :n_eigenvectors]
+        diff = (shape_vector - self.v_template).reshape(B, -1)
+        std = torch.norm(basis.reshape(-1, n_eigenvectors), dim=0)
+        inv = 1.0 / std.square()
+        params = inv * torch.matmul(diff, basis.reshape(3 * N, n_eigenvectors))
+        # params = torch.max(torch.min(params, std*-3.0), std*3.0)
+
+        return self.v_template + torch.matmul(params, basis.reshape(N * 3, n_eigenvectors).T).reshape(B, N, 3), params
+
+    def forward(self, shape_params=None, expression_params=None, pose_params=None, eye_pose_params=None, neck_pose_params=None, shape_basis_delta=None):
         """
             Input:
                 shape_params: N X number of shape parameters
@@ -205,11 +264,16 @@ class FLAME(nn.Module):
         """
         batch_size = shape_params.shape[0]
         if pose_params is None:
-            pose_params = self.eye_pose.expand(batch_size, -1).to('cuda:0')
+            pose_params = self.eye_pose.expand(batch_size, -1)
         if eye_pose_params is None:
-            eye_pose_params = self.eye_pose.expand(batch_size, -1).to('cuda:0')
+            eye_pose_params = self.eye_pose.expand(batch_size, -1)
+        if neck_pose_params is None:
+            neck_pose_params = self.neck_pose.expand(batch_size, -1)
+        if expression_params is None:
+            expression_params = torch.zeros([1, 100], dtype=self.dtype, requires_grad=False, device=self.neck_pose.device).expand(batch_size, -1)
+
         betas = torch.cat([shape_params, expression_params], dim=1)
-        full_pose = torch.cat([pose_params[:, :3], self.neck_pose.expand(batch_size, -1), pose_params[:, 3:], eye_pose_params], dim=1)
+        full_pose = torch.cat([pose_params[:, :3], neck_pose_params, pose_params[:, 3:], eye_pose_params], dim=1)
         template_vertices = self.v_template.unsqueeze(0).expand(batch_size, -1, -1)
 
         vertices, _ = lbs(betas, full_pose, template_vertices,
@@ -219,7 +283,7 @@ class FLAME(nn.Module):
 
         lmk_faces_idx = self.lmk_faces_idx.unsqueeze(dim=0).expand(batch_size, -1)
         lmk_bary_coords = self.lmk_bary_coords.unsqueeze(dim=0).expand(batch_size, -1, -1)
-        
+
         dyn_lmk_faces_idx, dyn_lmk_bary_coords = self._find_dynamic_lmk_idx_and_bcoords(
             full_pose, self.dynamic_lmk_faces_idx,
             self.dynamic_lmk_bary_coords,
@@ -228,12 +292,12 @@ class FLAME(nn.Module):
         lmk_bary_coords = torch.cat([dyn_lmk_bary_coords, lmk_bary_coords], 1)
 
         landmarks2d = vertices2landmarks(vertices, self.faces_tensor,
-                                       lmk_faces_idx,
-                                       lmk_bary_coords)
+                                         lmk_faces_idx,
+                                         lmk_bary_coords)
         bz = vertices.shape[0]
         landmarks3d = vertices2landmarks(vertices, self.faces_tensor,
-                                       self.full_lmk_faces_idx.repeat(bz, 1),
-                                       self.full_lmk_bary_coords.repeat(bz, 1, 1))
+                                         self.full_lmk_faces_idx.repeat(bz, 1),
+                                         self.full_lmk_bary_coords.repeat(bz, 1, 1))
         return vertices, landmarks2d, landmarks3d
 
 class FLAMETex(nn.Module):

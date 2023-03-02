@@ -233,13 +233,11 @@ class Trainer(object):
 
             with torch.no_grad():
                 ground_flame_verts, landmarks2d_, landmarks3d_ = self.deca.flame(
-                    shape_params=ground_shape_code,
-                    expression_params=ground_exp_code,
-                    pose_params=ground_pose_code)
+                    shape_params=ground_shape_code)
             
-            losses['flame'] = (pred_flame_verts - ground_flame_verts).abs().mean() * 1e4
+            losses['flame'] = (pred_flame_verts - ground_flame_verts).abs().mean() * 1e5
             with torch.no_grad():
-                losses['flame'] = losses['flame'] / 1e4
+                losses['flame'] = losses['flame'] / 1e5
 
             if self.cfg.model.jaw_type == 'euler':
                 # import ipdb; ipdb.set_trace()
