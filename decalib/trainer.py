@@ -235,7 +235,7 @@ class Trainer(object):
                 ground_flame_verts, landmarks2d_, landmarks3d_ = self.deca.flame(
                     shape_params=ground_shape_code)
             
-            losses['flame'] = (opdict['verts_only_shape'] - ground_flame_verts).abs().mean() * 5e3
+            losses['flame'] = (opdict['verts_only_shape'] - ground_flame_verts).abs().mean() * 100
 
             if self.cfg.model.jaw_type == 'euler':
                 # import ipdb; ipdb.set_trace()
