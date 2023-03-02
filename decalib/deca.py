@@ -179,6 +179,7 @@ class DECA(nn.Module):
         
         ## decode
         verts, landmarks2d, landmarks3d = self.flame(shape_params=codedict['shape'], expression_params=codedict['exp'], pose_params=codedict['pose'])
+        verts_only_shape,_,_ = self.flame(shape_params=codedict['shape'])
         if self.cfg.model.use_tex:
             albedo = self.flametex(codedict['tex'])
         else:
@@ -198,6 +199,7 @@ class DECA(nn.Module):
             'landmarks2d': landmarks2d,
             'landmarks3d': landmarks3d,
             'landmarks3d_world': landmarks3d_world,
+            'verts_only_shape': verts_only_shape
         }
 
         ## rendering
