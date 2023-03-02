@@ -179,10 +179,6 @@ class DECA(nn.Module):
         
         ## decode
         verts, landmarks2d, landmarks3d = self.flame(shape_params=codedict['shape'], expression_params=codedict['exp'], pose_params=codedict['pose'])
-        with torch.no_grad():
-            verts = verts * 1000
-            landmarks2d = landmarks2d * 1000
-            landmarks3d = landmarks3d * 1000
         if self.cfg.model.use_tex:
             albedo = self.flametex(codedict['tex'])
         else:
