@@ -23,8 +23,8 @@ def build_train(config, is_train=True):
 
 def build_val(config, is_train=True):
     data_list = []
-    if 'Stirling' in config.training_data:
-        data_list.append(BaseDataset('Stirling',config,False))
+    for name in config.eval_data:
+        data_list.append(BaseDataset(name,config,False))
     dataset = ConcatDataset(data_list)
 
     return dataset
