@@ -12,10 +12,6 @@ dataset:
   batch_size: 16
   K: 2
 
-loss:
-  # lmk: 1e-5
-  # eyed: 1e-5
-  # lipd: 5e-6
 
 train:
   lr: 7e-9
@@ -24,7 +20,7 @@ train:
   max_epochs: 1000
   max_steps: 200000
   log_steps: 10
-  vis_steps: 10
+  vis_steps: 20
   checkpoint_steps: 60
   val_steps: 50
   eval_steps: 1000
