@@ -44,7 +44,7 @@ class DECA(nn.Module):
             self.cfg = cfg
         else:
             self.cfg = config
-        self.device = device
+        self.device = f'{cfg.device}:{cfg.device_id}'
         self.image_size = self.cfg.dataset.image_size
         self.uv_size = self.cfg.model.uv_size
 
@@ -178,6 +178,7 @@ class DECA(nn.Module):
         batch_size = images.shape[0]
         
         ## decode
+        #world space 
         verts, landmarks2d, landmarks3d = self.flame(shape_params=codedict['shape'], expression_params=codedict['exp'], pose_params=codedict['pose'])
         verts_only_shape,_,_ = self.flame(shape_params=codedict['shape'])
         if self.cfg.model.use_tex:
@@ -189,6 +190,9 @@ class DECA(nn.Module):
         ## projection
         landmarks2d = util.batch_orth_proj(landmarks2d, codedict['cam'])[:,:,:2]
         landmarks2d[:,:,1:] = -landmarks2d[:,:,1:]#; landmarks2d = landmarks2d*self.image_size/2 + self.image_size/2
+
+        # 在学习MICA用FLAME的Loss训练之后，landmark2d不知道为啥会变得不对，加一个fc尝试纠正回去
+
         landmarks3d = util.batch_orth_proj(landmarks3d, codedict['cam'])
         landmarks3d[:,:,1:] = -landmarks3d[:,:,1:] #; landmarks3d = landmarks3d*self.image_size/2 + self.image_size/2
         trans_verts = util.batch_orth_proj(verts, codedict['cam'])

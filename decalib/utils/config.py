@@ -11,7 +11,7 @@ cfg = CN()
 abs_deca_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 cfg.deca_dir = abs_deca_dir
 cfg.device = 'cuda'
-cfg.device_id = '0'
+cfg.device_id = '1'
 
 cfg.pretrained_modelpath = os.path.join(cfg.deca_dir, 'data', 'demica.tar')
 cfg.output_dir = ''
@@ -57,7 +57,7 @@ cfg.model.max_z = 0.01
 # Options for Dataset
 # ---------------------------------------------------------------------------- #
 cfg.dataset = CN()
-cfg.dataset.training_data = ['LYHM','FaceWarehouse']
+cfg.dataset.training_data = ['FaceWarehouse','LYHM']
 # cfg.dataset.training_data = ['ethnicity']
 cfg.dataset.eval_data = ['Stirling']
 cfg.dataset.test_data = ['']

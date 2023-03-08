@@ -9,6 +9,8 @@ import torch
 import shutil
 from copy import deepcopy
 
+torch.cuda.set_device(1)
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
 np.random.seed(0)
 

@@ -155,9 +155,12 @@ class BaseDataset(Dataset, ABC):
             landmark_list.append(landmark[0])
 
             # 获得mask
-            mask = cv2.imread(mask_path)
-            single_mask = np.zeros((mask.shape[0],mask.shape[1],1),dtype=np.uint8)
-            cv2.cvtColor(mask,cv2.COLOR_RGB2GRAY,single_mask)
+            if os.path.exists(mask_path):
+                mask = cv2.imread(mask_path)
+                single_mask = np.zeros((mask.shape[0],mask.shape[1],1),dtype=np.uint8)
+                cv2.cvtColor(mask,cv2.COLOR_RGB2GRAY,single_mask)
+            else:
+                single_mask = np.zeros((224,224,1),dtype=np.int8)
             single_mask = cv2.resize(single_mask,(224,224))
             single_mask[single_mask > 0] = 1
             mask_list.append(np.array(single_mask))

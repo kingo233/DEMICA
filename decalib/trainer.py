@@ -47,7 +47,7 @@ class Trainer(object):
             self.cfg = cfg
         else:
             self.cfg = config
-        self.device = device
+        self.device = f'{cfg.device}:{cfg.device_id}'
         self.batch_size = self.cfg.dataset.batch_size
         self.image_size = self.cfg.dataset.image_size
         self.uv_size = self.cfg.model.uv_size
@@ -152,25 +152,19 @@ class Trainer(object):
             opdict = self.deca.decode(codedict, rendering = False, vis_lmk=False, return_vis=False, use_detail=False)
             opdict['images'] = images
             opdict['lmk'] = lmk
-            pred_flame_verts = opdict['verts']
+            pred_flame_verts = opdict['verts_only_shape']
 
             ground_flame_para = batch['flame']
-            ground_exp_code = ground_flame_para['expression_params']
             ground_shape_code = ground_flame_para['shape_params']
-            ground_pose_code = ground_flame_para['pose_params']
 
-            ground_exp_code = ground_exp_code.view(-1,ground_exp_code.shape[-1]).to('cuda:0')
-            ground_shape_code = ground_shape_code.view(-1,ground_shape_code.shape[-1]).to('cuda:0')
-            ground_pose_code = ground_pose_code.view(-1,ground_pose_code.shape[-1]).to('cuda:0')
+            ground_shape_code = ground_shape_code.view(-1,ground_shape_code.shape[-1]).cuda()
 
             #### ----------------------- Losses
             losses = {}
 
             with torch.no_grad():
                 ground_flame_verts, landmarks2d_, landmarks3d_ = self.deca.flame(
-                    shape_params=ground_shape_code,
-                    expression_params=ground_exp_code,
-                    pose_params=ground_pose_code)
+                    shape_params=ground_shape_code)
             
             losses['flame'] = (pred_flame_verts - ground_flame_verts).abs().mean() * 1000
         ###--------------- training coarse model
@@ -180,7 +174,6 @@ class Trainer(object):
             opdict = self.deca.decode(codedict, rendering = rendering, vis_lmk=False, return_vis=False, use_detail=False)
             opdict['images'] = images
             opdict['lmk'] = lmk
-            pred_flame_verts = opdict['verts']
 
             if self.cfg.loss.photo > 0.:
                 #------ rendering
@@ -227,15 +220,15 @@ class Trainer(object):
             ground_shape_code = ground_flame_para['shape_params']
             ground_pose_code = ground_flame_para['pose_params']
 
-            ground_exp_code = ground_exp_code.view(-1,ground_exp_code.shape[-1]).to('cuda:0')
-            ground_shape_code = ground_shape_code.view(-1,ground_shape_code.shape[-1]).to('cuda:0')
-            ground_pose_code = ground_pose_code.view(-1,ground_pose_code.shape[-1]).to('cuda:0')
+            ground_exp_code = ground_exp_code.view(-1,ground_exp_code.shape[-1]).cuda()
+            ground_shape_code = ground_shape_code.view(-1,ground_shape_code.shape[-1]).cuda()
+            ground_pose_code = ground_pose_code.view(-1,ground_pose_code.shape[-1]).cuda()
 
             with torch.no_grad():
                 ground_flame_verts, landmarks2d_, landmarks3d_ = self.deca.flame(
                     shape_params=ground_shape_code)
             
-            losses['flame'] = (opdict['verts_only_shape'] - ground_flame_verts).abs().mean() * 100
+            losses['flame'] = (opdict['verts_only_shape'] - ground_flame_verts).abs().mean() * 1000
 
             if self.cfg.model.jaw_type == 'euler':
                 # import ipdb; ipdb.set_trace()
@@ -504,6 +497,8 @@ class Trainer(object):
                         abs_grads_dict[grad_name] = []
                     grads_dict[grad_name].append(params.grad.mean())
                     abs_grads_dict[grad_name].append(params.grad.abs().mean())
+                
+                self.writer.add_scalar(f'lr',self.opt.param_groups[0]["lr"],self.global_step)
 
                 self.global_step += 1
                 if self.global_step > self.cfg.train.max_steps:

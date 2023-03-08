@@ -9,19 +9,20 @@
 output_dir: "logs/coarse"
 pretrained_modelpath: "logs/pretrain/demica.tar"
 dataset:
-  batch_size: 16
+  batch_size: 32
   K: 2
 
 
 train:
-  lr: 7e-9
-  min_lr: 6e-9
+  train_flame_only: False
+  lr: 5e-6
+  min_lr: 2e-6
   resume: True
-  max_epochs: 1000
+  max_epochs: 10000
   max_steps: 200000
   log_steps: 10
   vis_steps: 20
-  checkpoint_steps: 60
+  checkpoint_steps: 20
   val_steps: 50
   eval_steps: 1000
 
