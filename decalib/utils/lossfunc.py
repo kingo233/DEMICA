@@ -402,7 +402,7 @@ class IDMRFLoss(nn.Module):
 
     def exp_norm_relative_dist(self, relative_dist):
         scaled_dist = relative_dist
-        dist_before_norm = torch.exp((self.bias - scaled_dist)/self.nn_stretch_sigma)
+        dist_before_norm = torch.exp((self.bias - scaled_dist)/self.nn_stretch_sigma).clamp(-10,10)
         self.cs_NCHW = self.sum_normalize(dist_before_norm)
         return self.cs_NCHW
 
@@ -439,6 +439,7 @@ class IDMRFLoss(nn.Module):
 
     def forward(self, gen, tar):
         ## gen: [bz,3,h,w] rgb [0,1]
+        gen[gen < 0] = 0
         gen_vgg_feats = self.featlayer(gen)
         tar_vgg_feats = self.featlayer(tar)
         style_loss_list = [self.feat_style_layers[layer] * self.mrf_loss(gen_vgg_feats[layer], tar_vgg_feats[layer]) for layer in self.feat_style_layers]

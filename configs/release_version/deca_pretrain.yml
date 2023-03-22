@@ -11,10 +11,12 @@
 # 
 # '''
 output_dir: "logs/pretrain"
-pretrained_modelpath: ''
+pretrained_modelpath: 'logs/pretrain/demica_backup.tar'
 dataset:
   batch_size: 64
   K: 1
+  training_data: ['vggface2']
+  eval_data: ['vggface2']
 loss:
   photo: 0.
   id: 0.
@@ -24,12 +26,12 @@ loss:
   shape_consistency: False
 train:
   train_flame_only: False
-  lr: 4e-6
+  lr: 1e-5
   min_lr: 2e-6
   resume: True
   max_epochs: 1000
   max_steps: 100000
   vis_steps: 10
-  checkpoint_steps: 60
+  checkpoint_steps: 20
   val_steps: 500
   eval_steps: 1000

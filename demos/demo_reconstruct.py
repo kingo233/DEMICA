@@ -22,6 +22,7 @@ import argparse
 from tqdm import tqdm
 import torch
 
+torch.cuda.set_device(0)
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from decalib.deca import DECA
 from decalib.datasets import datasets 
@@ -47,17 +48,17 @@ def main(args):
     # for i in range(len(testdata)):
     for i in tqdm(range(len(testdata))):
         name = testdata[i]['imagename']
-        images = testdata[i]['image'].to(device)[None,...]
+        images = testdata[i]['images'].to(device)[None,...]
         arcfaces = testdata[i]['arcface'].to(device)[None,...]
         with torch.no_grad():
             codedict = deca.encode(images,arcfaces)
             opdict, visdict = deca.decode(codedict) #tensor
-            if args.render_orig:
-                tform = testdata[i]['tform'][None, ...]
-                tform = torch.inverse(tform).transpose(1,2).to(device)
-                original_image = testdata[i]['original_image'][None, ...].to(device)
-                _, orig_visdict = deca.decode(codedict, render_orig=True, original_image=original_image, tform=tform)    
-                orig_visdict['inputs'] = original_image            
+            # if args.render_orig:
+            #     tform = testdata[i]['tform'][None, ...]
+            #     tform = torch.inverse(tform).transpose(1,2).to(device)
+            #     original_image = testdata[i]['original_image'][None, ...].to(device)
+            #     _, orig_visdict = deca.decode(codedict, render_orig=True, original_image=original_image, tform=tform)    
+            #     orig_visdict['inputs'] = original_image            
 
         if args.saveDepth or args.saveKpt or args.saveObj or args.saveMat or args.saveImages:
             os.makedirs(os.path.join(savefolder, name), exist_ok=True)
@@ -76,17 +77,17 @@ def main(args):
             savemat(os.path.join(savefolder, name, name + '.mat'), opdict)
         if args.saveVis:
             cv2.imwrite(os.path.join(savefolder, name + '_vis.jpg'), deca.visualize(visdict))
-            if args.render_orig:
-                cv2.imwrite(os.path.join(savefolder, name + '_vis_original_size.jpg'), deca.visualize(orig_visdict))
+            # if args.render_orig:
+            #     cv2.imwrite(os.path.join(savefolder, name + '_vis_original_size.jpg'), deca.visualize(orig_visdict))
         if args.saveImages:
             for vis_name in ['inputs', 'rendered_images', 'albedo_images', 'shape_images', 'shape_detail_images', 'landmarks2d']:
                 if vis_name not in visdict.keys():
                     continue
                 image = util.tensor2image(visdict[vis_name][0])
                 cv2.imwrite(os.path.join(savefolder, name, name + '_' + vis_name +'.jpg'), util.tensor2image(visdict[vis_name][0]))
-                if args.render_orig:
-                    image = util.tensor2image(orig_visdict[vis_name][0])
-                    cv2.imwrite(os.path.join(savefolder, name, 'orig_' + name + '_' + vis_name +'.jpg'), util.tensor2image(orig_visdict[vis_name][0]))
+                # if args.render_orig:
+                #     image = util.tensor2image(orig_visdict[vis_name][0])
+                #     cv2.imwrite(os.path.join(savefolder, name, 'orig_' + name + '_' + vis_name +'.jpg'), util.tensor2image(orig_visdict[vis_name][0]))
     print(f'-- please check the results in {savefolder}')
         
 if __name__ == '__main__':
@@ -122,7 +123,7 @@ if __name__ == '__main__':
                         help='whether to save 2D and 3D keypoints' )
     parser.add_argument('--saveDepth', default=False, type=lambda x: x.lower() in ['true', '1'],
                         help='whether to save depth image' )
-    parser.add_argument('--saveObj', default=True, type=lambda x: x.lower() in ['true', '1'],
+    parser.add_argument('--saveObj', default=False, type=lambda x: x.lower() in ['true', '1'],
                         help='whether to save outputs as .obj, detail mesh will end with _detail.obj. \
                             Note that saving objs could be slow' )
     parser.add_argument('--saveMat', default=False, type=lambda x: x.lower() in ['true', '1'],

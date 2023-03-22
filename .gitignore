@@ -51,3 +51,5 @@ internal
 STIRLING/
 logs
 dataset
+data/arcface-backbone100.pth
+data/face_seg_fcn8s.pt

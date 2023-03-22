@@ -25,7 +25,7 @@ def build_val(config, is_train=True):
     data_list = []
     config.K = 1
     for name in config.eval_data:
-        data_list.append(BaseDataset(name,config,False))
+        data_list.append(BaseDataset(name,config,True))
     dataset = ConcatDataset(data_list)
 
     return dataset

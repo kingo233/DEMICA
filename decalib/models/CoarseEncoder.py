@@ -42,7 +42,7 @@ class MappingNetwork(nn.Module):
         output = self.output(h)
         return output
 
-class CoarseEncoder(nn.Module):
+class ShapeEncoder(nn.Module):
     def __init__(self,output_dim,arcface_pretrained_path=None):
         super().__init__()
         self.arcface = Arcface(pretrained_path=arcface_pretrained_path)

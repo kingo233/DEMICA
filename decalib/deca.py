@@ -27,7 +27,7 @@ import pickle
 from .utils.renderer import SRenderY, set_rasterizer
 from .models.encoders import ResnetEncoder
 from .models.FLAME import FLAME, FLAMETex
-from .models.CoarseEncoder import CoarseEncoder
+from .models.CoarseEncoder import ShapeEncoder
 from .models.decoders import Generator
 from .utils import util
 from .utils.rotation_converter import batch_euler2axis
@@ -79,8 +79,8 @@ class DECA(nn.Module):
         # encoders
         # 默认情况下，是分别载入deca和E_detail和D_detail,以及mica所使用的arcface
         # 输入大小112 * 112,数据范围归一到[-1,1]
-        self.E_flame = CoarseEncoder(output_dim=self.n_param,arcface_pretrained_path=model_cfg.arcface_model_path).to(self.device)
-        # self.E_flame = ResnetEncoder(outsize=self.n_param).to(self.device)
+        self.E_shape = ShapeEncoder(output_dim=model_cfg.n_shape,arcface_pretrained_path=model_cfg.arcface_model_path).to(self.device)
+        self.E_other = ResnetEncoder(outsize=self.n_param).to(self.device)
         # 输入大小224 * 224,数据范围归一化到[0,1]
         self.E_detail = ResnetEncoder(outsize=self.n_detail).to(self.device)
         # decoders
@@ -89,12 +89,6 @@ class DECA(nn.Module):
             self.flametex = FLAMETex(model_cfg).to(self.device)
         self.D_detail = Generator(latent_dim=self.n_detail+self.n_cond, out_channels=1, out_scale=model_cfg.max_z, sample_mode = 'bilinear').to(self.device)
 
-        deca_path = model_cfg.deca_model_path
-        if os.path.exists(deca_path):
-            logger.info(f"DECA model found,use E_detail and D_tail in {deca_path}")
-            old_deca = torch.load(deca_path)
-            util.copy_state_dict(self.E_detail.state_dict(), old_deca['E_detail'])
-            util.copy_state_dict(self.D_detail.state_dict(), old_deca['D_detail'])
 
         # resume model
         model_path = self.cfg.pretrained_modelpath
@@ -102,18 +96,20 @@ class DECA(nn.Module):
             logger.info(f'trained demica model found. load {model_path}')
             checkpoint = torch.load(model_path)
             self.checkpoint = checkpoint
-            util.copy_state_dict(self.E_flame.state_dict(), checkpoint['E_flame'])
-            util.copy_state_dict(self.E_detail.state_dict(), checkpoint['E_detail'])
-            util.copy_state_dict(self.D_detail.state_dict(), checkpoint['D_detail'])
+            util.copy_state_dict(self.E_shape.state_dict(), checkpoint['E_shape'])
+            util.copy_state_dict(self.E_other.state_dict(), checkpoint['E_other'])
+            # util.copy_state_dict(self.E_detail.state_dict(), checkpoint['E_detail'])
+            # util.copy_state_dict(self.D_detail.state_dict(), checkpoint['D_detail'])
         else:
             logger.info(f'please check model path: {model_path}')
             # exit()
         # eval mode
-        self.E_flame.eval()
+        self.E_shape.eval()
+        self.E_other.eval()
         self.E_detail.eval()
         self.D_detail.eval()
 
-    def decompose_code(self, code, num_dict):
+    def decompose_code(self, shape_param, other_params, num_dict):
         ''' Convert a flattened parameter vector to a dictionary of parameters
         code_dict.keys() = ['shape', 'tex', 'exp', 'pose', 'cam', 'light']
         '''
@@ -121,10 +117,11 @@ class DECA(nn.Module):
         start = 0
         for key in num_dict:
             end = start+int(num_dict[key])
-            code_dict[key] = code[:, start:end]
+            code_dict[key] = other_params[:, start:end]
             start = end
             if key == 'light':
                 code_dict[key] = code_dict[key].reshape(code_dict[key].shape[0], 9, 3)
+        code_dict['shape'] = shape_param
         return code_dict
 
     def displacement2normal(self, uv_z, coarse_verts, coarse_normals):
@@ -155,10 +152,18 @@ class DECA(nn.Module):
         if use_detail:
             # use_detail is for training detail model, need to set coarse model as eval mode
             with torch.no_grad():
-                parameters = self.E_flame(arcfaces)
+                shape_param = self.E_shape(arcfaces)
+                other_params = self.E_other(images)
         else:
-            parameters = self.E_flame(arcfaces)
-        codedict = self.decompose_code(parameters, self.param_dict)
+            if self.cfg.train.train_flame_only:
+                shape_param = self.E_shape(arcfaces)
+                with torch.no_grad():
+                    other_params = self.E_other(images)
+            else:
+                other_params = self.E_other(images)
+                with torch.no_grad():
+                    shape_param = self.E_shape(arcfaces)
+        codedict = self.decompose_code(shape_param, other_params,self.param_dict)
         codedict['images'] = images
         if use_detail:
             detailcode = self.E_detail(images)
@@ -179,8 +184,13 @@ class DECA(nn.Module):
         
         ## decode
         #world space 
-        verts, landmarks2d, landmarks3d = self.flame(shape_params=codedict['shape'], expression_params=codedict['exp'], pose_params=codedict['pose'])
-        verts_only_shape,_,_ = self.flame(shape_params=codedict['shape'])
+        if self.cfg.train.train_flame_only:
+            verts_only_shape,_ , landmarks3d_only_shape = self.flame(shape_params=codedict['shape'])
+            with torch.no_grad():
+                verts, landmarks2d, landmarks3d = self.flame(shape_params=codedict['shape'], expression_params=codedict['exp'], pose_params=codedict['pose'])
+        else:
+            verts, landmarks2d, landmarks3d = self.flame(shape_params=codedict['shape'], expression_params=codedict['exp'], pose_params=codedict['pose'])
+            verts_only_shape,_ , landmarks3d_only_shape = self.flame(shape_params=codedict['shape'])
         if self.cfg.model.use_tex:
             albedo = self.flametex(codedict['tex'])
         else:
@@ -188,14 +198,12 @@ class DECA(nn.Module):
         landmarks3d_world = landmarks3d.clone()
 
         ## projection
-        landmarks2d = util.batch_orth_proj(landmarks2d, codedict['cam'])[:,:,:2]
+        landmarks2d = util.batch_orth_proj_origin(landmarks2d, codedict['cam'])[:,:,:2]
         landmarks2d[:,:,1:] = -landmarks2d[:,:,1:]#; landmarks2d = landmarks2d*self.image_size/2 + self.image_size/2
 
-        # 在学习MICA用FLAME的Loss训练之后，landmark2d不知道为啥会变得不对，加一个fc尝试纠正回去
-
-        landmarks3d = util.batch_orth_proj(landmarks3d, codedict['cam'])
+        landmarks3d = util.batch_orth_proj_origin(landmarks3d, codedict['cam'])
         landmarks3d[:,:,1:] = -landmarks3d[:,:,1:] #; landmarks3d = landmarks3d*self.image_size/2 + self.image_size/2
-        trans_verts = util.batch_orth_proj(verts, codedict['cam'])
+        trans_verts = util.batch_orth_proj_origin(verts, codedict['cam'])
         trans_verts[:,:,1:] = -trans_verts[:,:,1:]
         opdict = {
             'verts': verts,
@@ -203,7 +211,8 @@ class DECA(nn.Module):
             'landmarks2d': landmarks2d,
             'landmarks3d': landmarks3d,
             'landmarks3d_world': landmarks3d_world,
-            'verts_only_shape': verts_only_shape
+            'verts_only_shape': verts_only_shape,
+            'landmarks3d_only_shape': landmarks3d_only_shape
         }
 
         ## rendering
@@ -344,7 +353,8 @@ class DECA(nn.Module):
 
     def model_dict(self):
         return {
-            'E_flame': self.E_flame.state_dict(),
+            'E_shape': self.E_shape.state_dict(),
+            'E_other': self.E_other.state_dict(),
             'E_detail': self.E_detail.state_dict(),
-            'D_detail': self.D_detail.state_dict()
+            'D_detail': self.D_detail.state_dict(),
         }

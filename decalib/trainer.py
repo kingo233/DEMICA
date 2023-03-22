@@ -79,13 +79,16 @@ class Trainer(object):
                                 list(self.deca.E_detail.parameters()) + \
                                 list(self.deca.D_detail.parameters())  ,
                                 lr=self.cfg.train.lr,
-                                weight_decay=self.cfg.train.decay,
                                 amsgrad=False)
+        elif self.cfg.train.train_flame_only:
+            self.opt = torch.optim.AdamW(lr=self.cfg.train.lr,
+                                         weight_decay=self.cfg.train.decay,
+                                         amsgrad=False,
+                                         params=self.deca.E_shape.parameters())
         else:
             self.opt = torch.optim.Adam(
-                                    self.deca.E_flame.parameters(),
+                                    self.deca.E_other.parameters(),
                                     lr=self.cfg.train.lr,
-                                    weight_decay=self.cfg.train.decay,
                                     amsgrad=False)
     def load_checkpoint(self):
         model_dict = self.deca.model_dict()
@@ -100,6 +103,13 @@ class Trainer(object):
             self.global_step = checkpoint['global_step']
             logger.info(f"resume training from {os.path.join(self.cfg.output_dir, 'demica.tar')}")
             logger.info(f"training start from step {self.global_step}")
+        # load model weights only
+        elif os.path.exists(os.path.join(self.cfg.output_dir, 'demica.tar')):
+            checkpoint = torch.load(os.path.join(self.cfg.output_dir, 'demica.tar'))
+            for key in model_dict.keys():
+                if key in checkpoint.keys():
+                    util.copy_state_dict(model_dict[key], checkpoint[key])
+            self.global_step = 0
         else:
             logger.info('model path not found, start training from scratch')
             self.global_step = 0
@@ -107,7 +117,8 @@ class Trainer(object):
     def training_step(self, batch, batch_nb, training_type='coarse'):
         self.deca.train()
         if self.train_detail:
-            self.deca.E_flame.eval()
+            self.deca.E_shape.eval()
+            self.deca.E_other.eval()
         # [B, K, 3, size, size] ==> [BxK, 3, size, size]
         # images是arcface input
         images = batch['images'].to(self.device); images = images.view(-1, images.shape[-3], images.shape[-2], images.shape[-1]) 
@@ -163,7 +174,7 @@ class Trainer(object):
             losses = {}
 
             with torch.no_grad():
-                ground_flame_verts, landmarks2d_, landmarks3d_ = self.deca.flame(
+                ground_flame_verts, _, _= self.deca.flame(
                     shape_params=ground_shape_code)
             
             losses['flame'] = (pred_flame_verts - ground_flame_verts).abs().mean() * 1000
@@ -215,21 +226,6 @@ class Trainer(object):
             losses['tex_reg'] = (torch.sum(codedict['tex']**2)/2)*self.cfg.loss.reg_tex
             losses['light_reg'] = ((torch.mean(codedict['light'], dim=2)[:,:,None] - codedict['light'])**2).mean()*self.cfg.loss.reg_light
 
-            ground_flame_para = batch['flame']
-            ground_exp_code = ground_flame_para['expression_params']
-            ground_shape_code = ground_flame_para['shape_params']
-            ground_pose_code = ground_flame_para['pose_params']
-
-            ground_exp_code = ground_exp_code.view(-1,ground_exp_code.shape[-1]).cuda()
-            ground_shape_code = ground_shape_code.view(-1,ground_shape_code.shape[-1]).cuda()
-            ground_pose_code = ground_pose_code.view(-1,ground_pose_code.shape[-1]).cuda()
-
-            with torch.no_grad():
-                ground_flame_verts, landmarks2d_, landmarks3d_ = self.deca.flame(
-                    shape_params=ground_shape_code)
-            
-            losses['flame'] = (opdict['verts_only_shape'] - ground_flame_verts).abs().mean() * 1000
-
             if self.cfg.model.jaw_type == 'euler':
                 # import ipdb; ipdb.set_trace()
                 # reg on jaw pose
@@ -252,10 +248,8 @@ class Trainer(object):
             landmarks2d = util.batch_orth_proj(landmarks2d, codedict['cam'])[:,:,:2]; landmarks2d[:,:,1:] = -landmarks2d[:,:,1:] #; landmarks2d = landmarks2d*self.image_size/2 + self.image_size/2
             # world to camera
             trans_verts = util.batch_orth_proj(verts, cam)
-            predicted_landmarks = util.batch_orth_proj(landmarks2d, cam)[:,:,:2]
             # camera to image space
             trans_verts[:,:,1:] = -trans_verts[:,:,1:]
-            predicted_landmarks[:,:,1:] = - predicted_landmarks[:,:,1:]
             
             albedo = self.deca.flametex(texcode)
 
@@ -365,13 +359,10 @@ class Trainer(object):
             imagename = batch['imagename']
             with torch.no_grad():
                 codedict = self.deca.encode(images, arcfaces)
-                _, visdict = self.deca.decode(codedict)
-                codedict['exp'][:] = 0.
-                codedict['pose'][:] = 0.
-                opdict, _ = self.deca.decode(codedict)
+                opdict, visdict = self.deca.decode(codedict)
             #-- save results for evaluation
-            verts = opdict['verts'].cpu().numpy()
-            landmark_51 = opdict['landmarks3d_world'][:, 17:]
+            verts = opdict['verts_only_shape'].cpu().numpy()
+            landmark_51 = opdict['landmarks3d_only_shape'][:, 17:]
             landmark_7 = landmark_51[:,[19, 22, 25, 28, 16, 31, 37]]
             landmark_7 = landmark_7.cpu().numpy()
             for k in range(images.shape[0]):
@@ -412,8 +403,6 @@ class Trainer(object):
 
     def fit(self):
         self.prepare_data()
-        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.opt,
-            mode='min',factor=0.5,verbose=True,threshold=1e-6,patience=10,min_lr=self.cfg.train.min_lr)
 
         import math
         # 每个epoch 包含的batch数
@@ -427,7 +416,6 @@ class Trainer(object):
             grads_dict = {}
             abs_grads_dict = {}
             part_loss_dict = {}
-            self.opt.zero_grad()
             for step in tqdm(range(iters_every_epoch), desc=f"Epoch[{epoch+1}/{self.cfg.train.max_epochs}]"):
                 if epoch*iters_every_epoch + step < self.global_step:
                     continue
@@ -479,9 +467,10 @@ class Trainer(object):
 
                 all_loss = losses['all_loss']
                 train_loss_list.append(all_loss)
+                self.opt.zero_grad()
                 all_loss.backward() 
                 self.opt.step()
-                self.scheduler.step(all_loss)
+                # self.scheduler.step(all_loss)
                 # self.opt.zero_grad()
                 # 每个batch的每个部分loss都保存
                 for k,v in losses.items():

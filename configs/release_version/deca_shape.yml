@@ -6,8 +6,8 @@
 # Time:
 # around 15min/1000iterations
 # in total, needs around 
-output_dir: "logs/coarse"
-pretrained_modelpath: "logs/pretrain/demica.tar"
+output_dir: "logs/shape"
+pretrained_modelpath: ""
 dataset:
   batch_size: 32
   K: 2
@@ -16,9 +16,9 @@ dataset:
 
 
 train:
-  train_flame_only: False
-  lr: 1e-6
-  resume: True
+  train_flame_only: True
+  lr: 1e-4
+  resume: False
   max_epochs: 10000
   max_steps: 200000
   log_steps: 10

@@ -13,15 +13,20 @@ output_dir: "logs/detail"
 pretrained_modelpath: "logs/coarse/demica.tar"
 dataset:
   batch_size: 6
-  K: 3
+  K: 2
+  training_data: ['FaceWarehouse','LYHM','FRGC']
+  eval_data: ['Stirling']
+
 train:
   train_detail: True
-  resume: True
-  max_epochs: 10
-  max_steps: 1000000
+  train_flame_only: False
+  lr: 1e-11
+  resume: False
+  max_epochs: 10000
+  max_steps: 200000
   log_steps: 10
-  vis_steps: 500
-  checkpoint_steps: 1000
-  val_steps: 500
+  vis_steps: 20
+  checkpoint_steps: 120
+  val_steps: 50
   eval_steps: 1000
 # python main_train_deca_release.py --cfg configs/release_version/deca_coarse.yml

@@ -34,6 +34,37 @@ from loguru import logger
 from skimage.io import imread
 from torch.utils.data import Dataset
 from torchvision import transforms
+import face_segmentation_pytorch as fsp
+from face_segmentation_pytorch.utils import normalize_range
+from PIL import Image
+from skimage.io import imread, imsave
+from skimage.transform import estimate_transform, warp, resize, rescale
+
+
+model = fsp.model.FaceSegmentationNet()
+fsp.utils.load_model_parameters(model,'data')
+model.eval()
+model.cuda()
+
+MEAN_BGR = np.array([104.00699, 116.66877, 122.67892])
+
+def segment(img_array):
+    # img: h,w,3
+    img_array = cv2.resize(img_array,(500,500))
+    img_array = (img_array * 255.0).astype(np.float32)
+    # cv2.imwrite('test.jpg',img_array)
+    img_array = normalize_range(img_array,out_range=(0, 255))
+    img_array -= MEAN_BGR
+    img_array = img_array.transpose((2, 0, 1))
+    img = torch.from_numpy(img_array).unsqueeze(0).cuda()
+    with torch.no_grad():
+        out = model(img, as_pmap=True)[0]
+        out = out.cpu().numpy()
+    out = cv2.resize(out,(224,224))
+    out[out >= 0.3] = 1
+    out[out < 0.3] = 0
+    # cv2.imwrite('test_out.jpg',out)
+    return out
 
 
 class BaseDataset(Dataset, ABC):
@@ -44,7 +75,7 @@ class BaseDataset(Dataset, ABC):
         self.face_dict = {}
         self.name = name
         self.min_max_K = 0
-        self.dataset_root = 'dataset'
+        self.dataset_root = '/home/data3/czy3d/datasets/DEMICA_dataset'
         self.total_images = 0
         self.image_folder = 'images'
         self.flame_folder = 'FLAME_parameters'
@@ -53,17 +84,39 @@ class BaseDataset(Dataset, ABC):
 
     def initialize(self):
         logger.info(f'[{self.name}] Initialization')
-        # 只要是数据集都会有npy文件
-        image_list_file = f'dataset/image_paths/{str.upper(self.name)}.npy'
-        logger.info(f'[{self.name}] Load cached file list: ' + image_list_file)
-        self.face_dict = np.load(image_list_file, allow_pickle=True).item()
-        self.actors = list(self.face_dict.keys())
+        image_list_file = f'{self.dataset_root}/image_paths/{str.upper(self.name)}.npy'
+        if os.path.exists(image_list_file):
+            logger.info(f'[{self.name}] Load cached file list: ' + image_list_file)
+            self.face_dict = np.load(image_list_file, allow_pickle=True).item()
+            self.actors = list(self.face_dict.keys())
+        else:
+            self.actors = os.listdir(os.path.join(self.dataset_root,self.name,self.image_folder))
+            self.face_dict = {}
+            for actor in self.actors:
+                prefix_path = os.path.join(self.dataset_root,self.name,self.image_folder,actor)
+                actor_img_list = os.listdir(prefix_path)
+                actor_img_list = [os.path.join(actor,img_path) for img_path in actor_img_list]
+                self.face_dict[actor] = actor_img_list
         logger.info(f'[Dataset {self.name}] Total {len(self.actors)} actors loaded!')
         self.set_smallest_k()
         # 为把原始图片裁剪成224*224做准备
         self.app = FaceAnalysis(name='antelopev2', providers=['CUDAExecutionProvider'])
         self.app.prepare(ctx_id=0, det_size=(224, 224))
         self.fan = FAN()
+        self.scale = 1.25
+    
+    def bbox2point(self, left, right, top, bottom, type='bbox'):
+        ''' bbox from detector and landmarks are different
+        '''
+        if type=='kpt68':
+            old_size = (right - left + bottom - top)/2*1.1
+            center = np.array([right - (right - left) / 2.0, bottom - (bottom - top) / 2.0 ])
+        elif type=='bbox':
+            old_size = (right - left + bottom - top)/2
+            center = np.array([right - (right - left) / 2.0, bottom - (bottom - top) / 2.0  + old_size*0.12])
+        else:
+            raise NotImplementedError
+        return old_size, center
 
     def set_smallest_k(self):
         self.min_max_K = np.Inf
@@ -75,8 +128,6 @@ class BaseDataset(Dataset, ABC):
             if length > max_min_k:
                 max_min_k = length
 
-        self.total_images = reduce(lambda k, l: l + k, map(lambda e: len(self.face_dict[e][0]), self.actors))
-        loguru.logger.info(f'Dataset {self.name} with min K = {self.min_max_K} max K = {max_min_k} length = {len(self.face_dict)} total images = {self.total_images}')
         return self.min_max_K
 
     def __len__(self):
@@ -84,7 +135,11 @@ class BaseDataset(Dataset, ABC):
 
     def __getitem__(self, index):
         actor = self.actors[index]
-        images_path, params_path = self.face_dict[actor]
+        if isinstance(self.face_dict[actor][0],list):
+            images_path, params_path = self.face_dict[actor]
+        else:
+            images_path = self.face_dict[actor]
+            params_path = 'none'
         # 根据数据集的不同决定要不要把actor前缀消除
         if self.name == 'Stirling':
             images_path = [path.split('/')[1] for path in images_path]
@@ -100,16 +155,20 @@ class BaseDataset(Dataset, ABC):
             K = max(0, min(200, self.min_max_K))
             sample_list = np.array(range(len(images_path))[:K])
 
-        params = np.load(os.path.join(self.dataset_root, self.name, self.flame_folder, params_path), allow_pickle=True)
-        pose = torch.tensor(params['pose']).float()
-        betas = torch.tensor(params['betas']).float()
+        flame_path = os.path.join(self.dataset_root, self.name, self.flame_folder, params_path)
+        if os.path.exists(flame_path):
+            params = np.load(flame_path, allow_pickle=True)
+            pose = torch.tensor(params['pose']).float()
+            betas = torch.tensor(params['betas']).float()
 
-        flame = {
-            'shape_params': torch.cat(K * [betas[:300][None]], dim=0),
-            'expression_params': torch.cat(K * [betas[300:][None]], dim=0),
-            'pose_params': torch.cat(K * [torch.cat([pose[:3], pose[6:9]])[None]], dim=0),
-        }
-
+            flame = {
+                'shape_params': torch.cat(K * [betas[:300][None]], dim=0),
+                'expression_params': torch.cat(K * [betas[300:][None]], dim=0),
+                'pose_params': torch.cat(K * [torch.cat([pose[:3], pose[6:9]])[None]], dim=0),
+            }
+        else:
+            # logger.warning(f'{self.name} dataset have no flame parameters!Use None')
+            flame = {}
         arcface_list = []
         landmark_list = []
         mask_list = []
@@ -121,6 +180,8 @@ class BaseDataset(Dataset, ABC):
             # w * h * 3
             img = cv2.imread(str(image_path))
             img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
+
+            # MICA 部分
             # 以下部分是在跑一个人脸检测模型，得到置信分数最高的边界框，然后裁剪
             bboxes, kpss = self.app.det_model.detect(img, max_num=0, metric='default')
             if bboxes.shape[0] == 0:
@@ -136,25 +197,51 @@ class BaseDataset(Dataset, ABC):
             # 获得裁剪的112*112输出，arcface用于粗糙模型，对应arcface
             arcface = face_align.norm_crop(img, landmark=face.kps, image_size=224)
             arcface = arcface / 255.0
-            detail_input = arcface
             arcface = cv2.resize(arcface,(112,112))
             arcface = np.transpose(arcface,(2,0,1))
             # 224 * 224对应images，是detail encoder输入
-            detail_input = np.transpose(detail_input,(2,0,1))
-            image_list.append(detail_input)
             arcface_list.append(arcface)
 
-            # 获得 landmarks，针对粗糙模型的，也即112*112的arcface
-            arcface = np.transpose(arcface,(1,2,0))
-            landmark = self.fan.model.get_landmarks(arcface * 255)
+
+            # DECA部分
+            image = np.array(imread(str(image_path)))
+            h, w, _ = image.shape
+            bbox, bbox_type = self.fan.run(image)
+            if len(bbox) < 4:
+                print('no face detected! run original image')
+                left = 0; right = h-1; top=0; bottom=w-1
+            else:
+                left = bbox[0]; right=bbox[2]
+                top = bbox[1]; bottom=bbox[3]
+            old_size, center = self.bbox2point(left, right, top, bottom, type=bbox_type)
+            size = int(old_size*self.scale)
+            src_pts = np.array([[center[0]-size/2, center[1]-size/2], [center[0] - size/2, center[1]+size/2], [center[0]+size/2, center[1]-size/2]])
+            
+            self.resolution_inp = 224
+            DST_PTS = np.array([[0,0], [0,self.resolution_inp - 1], [self.resolution_inp - 1, 0]])
+            tform = estimate_transform('similarity', src_pts, DST_PTS)
+            
+            image = image/255.
+
+            dst_image = warp(image, tform.inverse, output_shape=(self.resolution_inp, self.resolution_inp))
+            dst_image = dst_image.transpose(2,0,1)
+            image_list.append(dst_image)
+
+            # 获得 landmarks，也即224*224的detail
+
+            landmark_input = np.transpose(dst_image,(1,2,0))
+            landmark = self.fan.model.get_landmarks(landmark_input * 255)
             # 归一到[-1,1]
-            landmark[0] = landmark[0] / 112 * 2 - 1
+            landmark[0] = landmark[0] / 224.0 * 2 - 1
             # 堆叠[68,2] ->[68,3]
             landmark[0] = np.hstack([landmark[0],np.ones([68,1],dtype=np.float32)])
 
             landmark_list.append(landmark[0])
 
             # 获得mask
+            # dst_image = dst_image.transpose(1,2,0)
+            # single_mask = segment()
+            # single_mask = single_mask.reshape(224,224,1)
             if os.path.exists(mask_path):
                 mask = cv2.imread(mask_path)
                 single_mask = np.zeros((mask.shape[0],mask.shape[1],1),dtype=np.uint8)

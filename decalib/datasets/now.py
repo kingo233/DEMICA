@@ -15,7 +15,7 @@ from .detectors import FAN
 
 class NoWDatasetBackup(Dataset):
     def __init__(self, ring_elements=6, crop_size=224, scale=1.6):
-        folder = 'dataset/NoW_Dataset'
+        folder = '/home/data3/czy3d/datasts/DEMICA_dataset/NoW_Dataset'
         self.data_path = os.path.join(folder, 'imagepathsvalidation.txt')
         with open(self.data_path) as f:
             self.data_lines = f.readlines()
@@ -67,7 +67,7 @@ class NoWDatasetBackup(Dataset):
 
 class NoWDataset(Dataset):
     def __init__(self, ring_elements=6, crop_size=224, scale=1.6):
-        folder = 'dataset/NoW_Dataset'
+        folder = '/home/data3/czy3d/datasets/DEMICA_dataset/NoW_Dataset'
         self.data_path = os.path.join(folder, 'imagepathsvalidation.txt')
         with open(self.data_path) as f:
             self.data_lines = f.readlines()

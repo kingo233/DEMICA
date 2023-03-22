@@ -8,8 +8,8 @@ import torch.backends.cudnn as cudnn
 import torch
 import shutil
 from copy import deepcopy
-
-torch.cuda.set_device(1)
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+# torch.cuda.set_device(0)
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
 np.random.seed(0)

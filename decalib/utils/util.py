@@ -286,6 +286,18 @@ def batch_orth_proj(X, camera):
         camera: scale and translation, [bz, 3], [scale, tx, ty]
     '''
     camera = camera.clone().view(-1, 1, 3)
+    X_trans = X[:, :, :2] - camera[:, :, 1:]
+    X_trans = torch.cat([X_trans, -X[:,:,2:]], 2)
+    shape = X_trans.shape
+    Xn = (camera[:, :, 0:1] * X_trans)
+    return Xn
+
+def batch_orth_proj_origin(X, camera):
+    ''' orthgraphic projection
+        X:  3d vertices, [bz, n_point, 3]
+        camera: scale and translation, [bz, 3], [scale, tx, ty]
+    '''
+    camera = camera.clone().view(-1, 1, 3)
     X_trans = X[:, :, :2] + camera[:, :, 1:]
     X_trans = torch.cat([X_trans, X[:,:,2:]], 2)
     shape = X_trans.shape

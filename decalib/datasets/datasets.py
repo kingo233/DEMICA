@@ -25,7 +25,10 @@ from skimage.transform import estimate_transform, warp, resize, rescale
 from glob import glob
 import scipy.io
 
-from . import detectors
+from insightface.app import FaceAnalysis
+from insightface.app.common import Face
+from insightface.utils import face_align
+from .detectors import FAN
 
 def video2sequence(video_path, sample_step=10):
     videofolder = os.path.splitext(video_path)[0]
@@ -67,8 +70,10 @@ class TestData(Dataset):
         self.scale = scale
         self.iscrop = iscrop
         self.resolution_inp = crop_size
+        self.app = FaceAnalysis(name='antelopev2', providers=['CUDAExecutionProvider'])
+        self.app.prepare(ctx_id=0, det_size=(224, 224))
         if face_detector == 'fan':
-            self.face_detector = detectors.FAN()
+            self.face_detector = FAN()
         # elif face_detector == 'mtcnn':
         #     self.face_detector = detectors.MTCNN()
         else:
@@ -136,8 +141,52 @@ class TestData(Dataset):
 
         dst_image = warp(image, tform.inverse, output_shape=(self.resolution_inp, self.resolution_inp))
         dst_image = dst_image.transpose(2,0,1)
-        return {'image': torch.tensor(dst_image).float(),
+
+        # w * h * 3
+        img = cv2.imread(imagepath)
+        img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
+
+        # MICA 部分
+        # 以下部分是在跑一个人脸检测模型，得到置信分数最高的边界框，然后裁剪
+        bboxes, kpss = self.app.det_model.detect(img, max_num=0, metric='default')
+        i = get_center(bboxes, img)
+        bbox = bboxes[i, 0:4]
+        det_score = bboxes[i, 4]
+        kps = None
+        if kpss is not None:
+            kps = kpss[i]
+
+        face = Face(bbox=bbox, kps=kps, det_score=det_score)
+        # 获得裁剪的112*112输出，arcface用于粗糙模型，对应arcface
+        arcface = face_align.norm_crop(img, landmark=face.kps, image_size=224)
+        arcface = arcface / 255.0
+        arcface = cv2.resize(arcface,(112,112))
+        arcface = np.transpose(arcface,(2,0,1))
+
+        return {'images': torch.tensor(dst_image).float(),
                 'imagename': imagename,
                 'tform': torch.tensor(tform.params).float(),
                 'original_image': torch.tensor(image.transpose(2,0,1)).float(),
+                'arcface': torch.tensor(arcface).float()
                 }
+
+import math
+def dist(p1, p2):
+    return math.sqrt(((p1[0] - p2[0]) ** 2) + ((p1[1] - p2[1]) ** 2))
+
+
+def get_center(bboxes, img):
+    img_center = img.shape[0] // 2, img.shape[1] // 2
+    size = bboxes.shape[0]
+    distance = np.Inf
+    j = 0
+    for i in range(size):
+        x1, y1, x2, y2 = bboxes[i, 0:4]
+        dx = abs(x2 - x1) / 2.0
+        dy = abs(y2 - y1) / 2.0
+        current = dist((x1 + dx, y1 + dy), img_center)
+        if current < distance:
+            distance = current
+            j = i
+
+    return j
