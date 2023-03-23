@@ -183,49 +183,68 @@ class BaseDataset(Dataset, ABC):
 
             # MICA 部分
             # 以下部分是在跑一个人脸检测模型，得到置信分数最高的边界框，然后裁剪
-            bboxes, kpss = self.app.det_model.detect(img, max_num=0, metric='default')
-            if bboxes.shape[0] == 0:
-                continue
-            i = get_center(bboxes, img)
-            bbox = bboxes[i, 0:4]
-            det_score = bboxes[i, 4]
-            kps = None
-            if kpss is not None:
-                kps = kpss[i]
 
-            face = Face(bbox=bbox, kps=kps, det_score=det_score)
-            # 获得裁剪的112*112输出，arcface用于粗糙模型，对应arcface
-            arcface = face_align.norm_crop(img, landmark=face.kps, image_size=224)
-            arcface = arcface / 255.0
-            arcface = cv2.resize(arcface,(112,112))
-            arcface = np.transpose(arcface,(2,0,1))
-            # 224 * 224对应images，是detail encoder输入
-            arcface_list.append(arcface)
+            # arcface_path
+            arcface_path = str(image_path).replace('images','arcface')
+            if os.path.exists(arcface_path):
+                arcface = cv2.imread(str(arcface_path))
+                arcface = cv2.cvtColor(arcface,cv2.COLOR_BGR2RGB)
+                arcface_list.append(arcface)
+            else:
+                bboxes, kpss = self.app.det_model.detect(img, max_num=0, metric='default')
+                if bboxes.shape[0] == 0:
+                    continue
+                i = get_center(bboxes, img)
+                bbox = bboxes[i, 0:4]
+                det_score = bboxes[i, 4]
+                kps = None
+                if kpss is not None:
+                    kps = kpss[i]
 
+                face = Face(bbox=bbox, kps=kps, det_score=det_score)
+                # 获得裁剪的112*112输出，arcface用于粗糙模型，对应arcface
+                arcface = face_align.norm_crop(img, landmark=face.kps, image_size=224)
+                arcface = arcface / 255.0
+                arcface = cv2.resize(arcface,(112,112))
+                arcface = np.transpose(arcface,(2,0,1))
+                # 224 * 224对应images，是detail encoder输入
+                arcface_list.append(arcface)
+
+                cv2.imwrite(str(arcface_path),arcface)
+
+            
 
             # DECA部分
-            image = np.array(imread(str(image_path)))
-            h, w, _ = image.shape
-            bbox, bbox_type = self.fan.run(image)
-            if len(bbox) < 4:
-                print('no face detected! run original image')
-                left = 0; right = h-1; top=0; bottom=w-1
+            dst_path = str(image_path).replace('images','arcface')
+            if os.path.exists(dst_path):
+                dst_image = cv2.imread(dst_path)
+                dst_image = cv2.cvtColor(dst_image,cv2.COLOR_BGR2RGB)
+                image_list.append(dst_image)
             else:
-                left = bbox[0]; right=bbox[2]
-                top = bbox[1]; bottom=bbox[3]
-            old_size, center = self.bbox2point(left, right, top, bottom, type=bbox_type)
-            size = int(old_size*self.scale)
-            src_pts = np.array([[center[0]-size/2, center[1]-size/2], [center[0] - size/2, center[1]+size/2], [center[0]+size/2, center[1]-size/2]])
-            
-            self.resolution_inp = 224
-            DST_PTS = np.array([[0,0], [0,self.resolution_inp - 1], [self.resolution_inp - 1, 0]])
-            tform = estimate_transform('similarity', src_pts, DST_PTS)
-            
-            image = image/255.
+                image = np.array(imread(str(image_path)))
+                h, w, _ = image.shape
+                bbox, bbox_type = self.fan.run(image)
+                if len(bbox) < 4:
+                    print('no face detected! run original image')
+                    left = 0; right = h-1; top=0; bottom=w-1
+                else:
+                    left = bbox[0]; right=bbox[2]
+                    top = bbox[1]; bottom=bbox[3]
+                old_size, center = self.bbox2point(left, right, top, bottom, type=bbox_type)
+                size = int(old_size*self.scale)
+                src_pts = np.array([[center[0]-size/2, center[1]-size/2], [center[0] - size/2, center[1]+size/2], [center[0]+size/2, center[1]-size/2]])
+                
+                self.resolution_inp = 224
+                DST_PTS = np.array([[0,0], [0,self.resolution_inp - 1], [self.resolution_inp - 1, 0]])
+                tform = estimate_transform('similarity', src_pts, DST_PTS)
+                
+                image = image/255.
 
-            dst_image = warp(image, tform.inverse, output_shape=(self.resolution_inp, self.resolution_inp))
-            dst_image = dst_image.transpose(2,0,1)
-            image_list.append(dst_image)
+                dst_image = warp(image, tform.inverse, output_shape=(self.resolution_inp, self.resolution_inp))
+                dst_image = dst_image.transpose(2,0,1)
+                image_list.append(dst_image)
+
+                cv2.imwrite(str(dst_path),dst_image)
 
             # 获得 landmarks，也即224*224的detail
 
