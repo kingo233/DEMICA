@@ -44,6 +44,7 @@ def main(args):
     deca_cfg.model.use_tex = args.useTex
     deca_cfg.rasterizer_type = args.rasterizer_type
     deca_cfg.model.extract_tex = args.extractTex
+    deca_cfg.deca_model_path = args.deca_model_path
     deca = DECA(config = deca_cfg, device=device)
     # for i in range(len(testdata)):
     for i in tqdm(range(len(testdata))):
@@ -92,6 +93,8 @@ def main(args):
         
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='DECA: Detailed Expression Capture and Animation')
+
+    parser.add_argument('--deca_model_path',default='data/deca_model.tar')
 
     parser.add_argument('-i', '--inputpath', default='TestSamples/examples', type=str,
                         help='path to the test data, can be image folder, image path, image list, video')

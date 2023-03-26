@@ -47,6 +47,7 @@ model.eval()
 model.cuda()
 
 MEAN_BGR = np.array([104.00699, 116.66877, 122.67892])
+MEAN_RGB = np.array([122.67892, 116.66877, 104.00699])
 
 def segment(img_array):
     # img: h,w,3
@@ -54,16 +55,16 @@ def segment(img_array):
     img_array = (img_array * 255.0).astype(np.float32)
     # cv2.imwrite('test.jpg',img_array)
     img_array = normalize_range(img_array,out_range=(0, 255))
-    img_array -= MEAN_BGR
+    img_array -= MEAN_RGB
     img_array = img_array.transpose((2, 0, 1))
     img = torch.from_numpy(img_array).unsqueeze(0).cuda()
     with torch.no_grad():
         out = model(img, as_pmap=True)[0]
         out = out.cpu().numpy()
     out = cv2.resize(out,(224,224))
-    out[out >= 0.3] = 1
-    out[out < 0.3] = 0
-    # cv2.imwrite('test_out.jpg',out)
+    out[out >= 0.5] = 1
+    out[out < 0.5] = 0
+    # cv2.imwrite('test_out.jpg',out * 255)
     return out
 
 
@@ -210,6 +211,7 @@ class BaseDataset(Dataset, ABC):
                 # 224 * 224对应images，是detail encoder输入
                 arcface_list.append(arcface)
 
+                arcface = np.transpose(arcface,(1,2,0))
                 cv2.imwrite(str(arcface_path),arcface)
 
             
@@ -244,12 +246,12 @@ class BaseDataset(Dataset, ABC):
                 dst_image = dst_image.transpose(2,0,1)
                 image_list.append(dst_image)
 
+                dst_image = dst_image.transpose(1,2,0)
                 cv2.imwrite(str(dst_path),dst_image)
 
             # 获得 landmarks，也即224*224的detail
 
-            landmark_input = np.transpose(dst_image,(1,2,0))
-            landmark = self.fan.model.get_landmarks(landmark_input * 255)
+            landmark = self.fan.model.get_landmarks(dst_image * 255)
             # 归一到[-1,1]
             landmark[0] = landmark[0] / 224.0 * 2 - 1
             # 堆叠[68,2] ->[68,3]
@@ -258,17 +260,16 @@ class BaseDataset(Dataset, ABC):
             landmark_list.append(landmark[0])
 
             # 获得mask
-            # dst_image = dst_image.transpose(1,2,0)
-            # single_mask = segment()
-            # single_mask = single_mask.reshape(224,224,1)
-            if os.path.exists(mask_path):
-                mask = cv2.imread(mask_path)
-                single_mask = np.zeros((mask.shape[0],mask.shape[1],1),dtype=np.uint8)
-                cv2.cvtColor(mask,cv2.COLOR_RGB2GRAY,single_mask)
-            else:
-                single_mask = np.zeros((224,224,1),dtype=np.int8)
-            single_mask = cv2.resize(single_mask,(224,224))
-            single_mask[single_mask > 0] = 1
+            single_mask = segment(dst_image)
+            single_mask = single_mask.reshape(224,224,1)
+            # if os.path.exists(mask_path):
+            #     mask = cv2.imread(mask_path)
+            #     single_mask = np.zeros((mask.shape[0],mask.shape[1],1),dtype=np.uint8)
+            #     cv2.cvtColor(mask,cv2.COLOR_RGB2GRAY,single_mask)
+            # else:
+            #     single_mask = np.zeros((224,224,1),dtype=np.int8)
+            # single_mask = cv2.resize(single_mask,(224,224))
+            # single_mask[single_mask > 0] = 1
             mask_list.append(np.array(single_mask))
 
         arcfaces_array = torch.from_numpy(np.array(arcface_list)).float()

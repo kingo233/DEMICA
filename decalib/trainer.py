@@ -245,9 +245,9 @@ class Trainer(object):
 
             # FLAME - world space
             verts, landmarks2d, landmarks3d = self.deca.flame(shape_params=shapecode, expression_params=expcode, pose_params=posecode)
-            landmarks2d = util.batch_orth_proj(landmarks2d, codedict['cam'])[:,:,:2]; landmarks2d[:,:,1:] = -landmarks2d[:,:,1:] #; landmarks2d = landmarks2d*self.image_size/2 + self.image_size/2
+            landmarks2d = util.batch_orth_proj_origin(landmarks2d, codedict['cam'])[:,:,:2]; landmarks2d[:,:,1:] = -landmarks2d[:,:,1:] #; landmarks2d = landmarks2d*self.image_size/2 + self.image_size/2
             # world to camera
-            trans_verts = util.batch_orth_proj(verts, cam)
+            trans_verts = util.batch_orth_proj_origin(verts, cam)
             # camera to image space
             trans_verts[:,:,1:] = -trans_verts[:,:,1:]
             

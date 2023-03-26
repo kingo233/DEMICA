@@ -89,7 +89,13 @@ class DECA(nn.Module):
             self.flametex = FLAMETex(model_cfg).to(self.device)
         self.D_detail = Generator(latent_dim=self.n_detail+self.n_cond, out_channels=1, out_scale=model_cfg.max_z, sample_mode = 'bilinear').to(self.device)
 
-
+        deca_model_path = self.cfg.deca_model_path
+        if os.path.exists(deca_model_path):
+            logger.info(f'trained deca model found. load {deca_model_path}')
+            checkpoint = torch.load(deca_model_path)
+            self.checkpoint = checkpoint
+            util.copy_state_dict(self.E_detail.state_dict(), checkpoint['E_detail'])
+            util.copy_state_dict(self.D_detail.state_dict(), checkpoint['D_detail'])
         # resume model
         model_path = self.cfg.pretrained_modelpath
         if os.path.exists(model_path):

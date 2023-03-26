@@ -11,13 +11,13 @@ pretrained_modelpath: "logs/pretrain/demica.tar"
 dataset:
   batch_size: 32
   K: 2
-  training_data: ['FaceWarehouse','LYHM','FRGC']
+  training_data: ['vggface2']
   eval_data: ['Stirling']
 
 
 train:
   train_flame_only: False
-  lr: 1e-6
+  lr: 1e-4
   resume: True
   max_epochs: 10000
   max_steps: 200000

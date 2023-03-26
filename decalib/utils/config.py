@@ -13,6 +13,7 @@ cfg.deca_dir = abs_deca_dir
 cfg.device = 'cuda'
 cfg.device_id = '0'
 
+cfg.deca_model_path = os.path.join(cfg.deca_dir, 'data', 'deca_model.tar')
 cfg.pretrained_modelpath = os.path.join(cfg.deca_dir, 'data', 'demica.tar')
 cfg.output_dir = ''
 cfg.rasterizer_type = 'pytorch3d'
