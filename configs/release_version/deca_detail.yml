@@ -12,20 +12,20 @@
 output_dir: "logs/detail"
 pretrained_modelpath: "logs/coarse/demica.tar"
 dataset:
-  batch_size: 5
+  batch_size: 6
   K: 3
-  training_data: ['FaceWarehouse','LYHM','FRGC']
+  training_data: ['vggface2']
   eval_data: ['Stirling']
 
 train:
   train_detail: True
   train_flame_only: False
-  lr: 1e-11
-  resume: False
+  lr: 1e-4
+  resume: True
   max_epochs: 10000
   max_steps: 200000
   log_steps: 10
-  vis_steps: 20
+  vis_steps: 120
   checkpoint_steps: 120
   val_steps: 50
   eval_steps: 1000

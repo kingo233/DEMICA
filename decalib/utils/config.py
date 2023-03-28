@@ -134,7 +134,7 @@ def update_cfg(cfg, cfg_file):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--cfg', type=str, help='cfg file path',default='configs/release_version/deca_coarse.yml')
+    parser.add_argument('--cfg', type=str, help='cfg file path',default='configs/release_version/deca_detail.yml')
     parser.add_argument('--mode', type=str, default = 'train', help='deca mode')
 
     args = parser.parse_args()

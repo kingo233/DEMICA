@@ -104,8 +104,8 @@ class DECA(nn.Module):
             self.checkpoint = checkpoint
             util.copy_state_dict(self.E_shape.state_dict(), checkpoint['E_shape'])
             util.copy_state_dict(self.E_other.state_dict(), checkpoint['E_other'])
-            # util.copy_state_dict(self.E_detail.state_dict(), checkpoint['E_detail'])
-            # util.copy_state_dict(self.D_detail.state_dict(), checkpoint['D_detail'])
+            util.copy_state_dict(self.E_detail.state_dict(), checkpoint['E_detail'])
+            util.copy_state_dict(self.D_detail.state_dict(), checkpoint['D_detail'])
         else:
             logger.info(f'please check model path: {model_path}')
             # exit()
@@ -236,8 +236,8 @@ class DECA(nn.Module):
             background = None
 
         if rendering:
-            # ops = self.render(verts, trans_verts, albedo, codedict['light'])
-            ops = self.render(verts, trans_verts, albedo, h=h, w=w, background=background)
+            ops = self.render(verts, trans_verts, albedo, codedict['light'])
+            # ops = self.render(verts, trans_verts, albedo, h=h, w=w, background=background)
             ## output
             opdict['grid'] = ops['grid']
             opdict['rendered_images'] = ops['images']

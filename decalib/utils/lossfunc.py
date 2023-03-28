@@ -439,7 +439,6 @@ class IDMRFLoss(nn.Module):
 
     def forward(self, gen, tar):
         ## gen: [bz,3,h,w] rgb [0,1]
-        gen[gen < 0] = 0
         gen_vgg_feats = self.featlayer(gen)
         tar_vgg_feats = self.featlayer(tar)
         style_loss_list = [self.feat_style_layers[layer] * self.mrf_loss(gen_vgg_feats[layer], tar_vgg_feats[layer]) for layer in self.feat_style_layers]
