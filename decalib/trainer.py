@@ -132,30 +132,30 @@ class Trainer(object):
         ### shape constraints for coarse model
         ### detail consistency for detail model
         # import ipdb; ipdb.set_trace()
-        # if self.cfg.loss.shape_consistency or self.cfg.loss.detail_consistency:
-        #     '''
-        #     make sure s0, s1 is something to make shape close
-        #     the difference from ||so - s1|| is 
-        #     the later encourage s0, s1 is cloase in l2 space, but not really ensure shape will be close
-        #     '''
-        #     new_order = np.array([np.random.permutation(self.K) + i*self.K for i in range(self.batch_size)])
-        #     new_order = new_order.flatten()
-        #     shapecode = codedict['shape']
-        #     if self.train_detail:
-        #         detailcode = codedict['detail']
-        #         detailcode_new = detailcode[new_order]
-        #         codedict['detail'] = torch.cat([detailcode, detailcode_new], dim=0)
-        #         codedict['shape'] = torch.cat([shapecode, shapecode], dim=0)
-        #     else:
-        #         shapecode_new = shapecode[new_order]
-        #         codedict['shape'] = torch.cat([shapecode, shapecode_new], dim=0)
-        #     for key in ['tex', 'exp', 'pose', 'cam', 'light', 'images']:
-        #         code = codedict[key]
-        #         codedict[key] = torch.cat([code, code], dim=0)
-            ## append gt
-            # images = torch.cat([images, images], dim=0)# images = images.view(-1, images.shape[-3], images.shape[-2], images.shape[-1]) 
-            # lmk = torch.cat([lmk, lmk], dim=0) #lmk = lmk.view(-1, lmk.shape[-2], lmk.shape[-1])
-            # masks = torch.cat([masks, masks], dim=0)
+        if self.cfg.loss.shape_consistency or self.cfg.loss.detail_consistency:
+            '''
+            make sure s0, s1 is something to make shape close
+            the difference from ||so - s1|| is 
+            the later encourage s0, s1 is cloase in l2 space, but not really ensure shape will be close
+            '''
+            new_order = np.array([np.random.permutation(self.K) + i*self.K for i in range(self.batch_size)])
+            new_order = new_order.flatten()
+            shapecode = codedict['shape']
+            if self.train_detail:
+                detailcode = codedict['detail']
+                detailcode_new = detailcode[new_order]
+                codedict['detail'] = torch.cat([detailcode, detailcode_new], dim=0)
+                codedict['shape'] = torch.cat([shapecode, shapecode], dim=0)
+            else:
+                shapecode_new = shapecode[new_order]
+                codedict['shape'] = torch.cat([shapecode, shapecode_new], dim=0)
+            for key in ['tex', 'exp', 'pose', 'cam', 'light', 'images']:
+                code = codedict[key]
+                codedict[key] = torch.cat([code, code], dim=0)
+            # append gt
+            images = torch.cat([images, images], dim=0)# images = images.view(-1, images.shape[-3], images.shape[-2], images.shape[-1]) 
+            lmk = torch.cat([lmk, lmk], dim=0) #lmk = lmk.view(-1, lmk.shape[-2], lmk.shape[-1])
+            masks = torch.cat([masks, masks], dim=0)
 
         batch_size = images.shape[0]
 
@@ -255,6 +255,7 @@ class Trainer(object):
 
             #------ rendering
             ops = self.deca.render(verts, trans_verts, albedo, lightcode) 
+            # ops = self.deca.render(verts, trans_verts, albedo, h=224, w=224, background=None)
             # mask
             mask_face_eye = F.grid_sample(self.deca.uv_face_eye_mask.expand(batch_size,-1,-1,-1), ops['grid'].detach(), align_corners=False)
             # images
@@ -385,6 +386,39 @@ class Trainer(object):
         ## then please run main.py in https://github.com/soubhiksanyal/now_evaluation, it will take around 30min to get the metric results
         self.deca.train()
 
+    def realy(self):
+        ''' realy validation 
+        '''
+        os.makedirs(os.path.join(self.cfg.output_dir, 'REALY_validation'), exist_ok=True)
+        savefolder = os.path.join(self.cfg.output_dir, 'REALY_validation', f'step_{self.global_step:08}') 
+        os.makedirs(savefolder, exist_ok=True)
+        self.deca.eval()
+        # run now validation images
+        from .datasets.realy import REALYDataset
+        dataset = REALYDataset()
+        dataloader = DataLoader(dataset, batch_size=8, shuffle=False,
+                            num_workers=0,
+                            pin_memory=True,
+                            drop_last=False)
+        faces = self.deca.flame.faces_tensor.cpu().numpy()
+        for i, batch in enumerate(tqdm(dataloader, desc='REALY evaluation ')):
+            images = batch['image'].to(self.device)
+            arcfaces = batch['arcface'].to(self.device)
+            imagename = batch['imagename']
+            with torch.no_grad():
+                codedict = self.deca.encode(images, arcfaces)
+                opdict, visdict = self.deca.decode(codedict)
+            #-- save results for evaluation
+            verts = opdict['verts'].cpu().numpy()
+
+            for k in range(images.shape[0]):
+                # save mesh
+                util.write_obj(os.path.join(savefolder, f'{imagename[k]}.obj'), vertices=verts[k], faces=faces)
+            # visualize results to check
+            util.visualize_grid(visdict, os.path.join(savefolder, f'{i}.jpg'))
+
+        self.deca.train()
+
     def prepare_data(self):
         self.train_dataset = build_datasets.build_train(self.cfg.dataset)
         self.val_dataset = build_datasets.build_val(self.cfg.dataset)
@@ -468,7 +502,9 @@ class Trainer(object):
                 all_loss = losses['all_loss']
                 train_loss_list.append(all_loss)
                 self.opt.zero_grad()
+                # with torch.autograd.detect_anomaly():
                 all_loss.backward() 
+                # nn.utils.clip_grad_norm_(self.deca.parameters(), max_norm=1)
                 self.opt.step()
                 # self.scheduler.step(all_loss)
                 # self.opt.zero_grad()
