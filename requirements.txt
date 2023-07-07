@@ -14,7 +14,7 @@ flatbuffers==23.1.21
 fonttools==4.38.0
 google-auth==2.16.1
 google-auth-oauthlib==0.4.6
-grpcio==1.51.1
+grpcio==1.53.0
 h5py==3.8.0
 humanfriendly==10.0
 idna==3.4
